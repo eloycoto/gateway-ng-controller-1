@@ -16,7 +16,8 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
             toolchain: nightly
-            components: clippy
+            # Note: tonic_build will use rustfmt to format generated code
+            components: clippy, rustfmt
             override: true
 
       - uses: actions-rs/clippy-check@v1
