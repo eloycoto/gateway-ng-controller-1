@@ -1,0 +1,33 @@
+on: [push]
+
+name: Code coverage
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run cargo-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1.2
+        with:
+          args: '-- --test-threads 1'
+          out-type: Html
+
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v2.1.4
+        with:
+          name: code-coverage-report
+          path: tarpaulin-report.html
+
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v1.0.2
+        with:
+          token: ${{secrets.CODECOV_TOKEN}}
