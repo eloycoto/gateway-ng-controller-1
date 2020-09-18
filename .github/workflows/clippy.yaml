@@ -1,5 +1,10 @@
-on: push
 name: Clippy check
+
+on:
+  push:
+    branches-ignore:
+      - '**.tmp'
+
 jobs:
   clippy_check:
     runs-on: ubuntu-latest
