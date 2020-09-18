@@ -1,15 +1,25 @@
-on: push
 name: Clippy check
+
+on:
+  push:
+    branches-ignore:
+      - '**.tmp'
+
 jobs:
   clippy_check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
       - uses: actions-rs/toolchain@v1
         with:
             toolchain: nightly
-            components: clippy
+            # Note: tonic_build will use rustfmt to format generated code
+            components: clippy, rustfmt
             override: true
+
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,2 +1,4 @@
 /target
 /tarpaulin_report.html
+# Generated protobuffers
+/src/protobuf
