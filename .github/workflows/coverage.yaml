@@ -1,6 +1,9 @@
-on: [push]
-
 name: Code coverage
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
 
 jobs:
   coverage:
