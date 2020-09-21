@@ -4,7 +4,7 @@ on:
     paths: 
       - '**/Cargo.toml'
       - '**/Cargo.lock'
-    branches_ignore:
+    branches-ignore:
       - '**.tmp'
 
 jobs:
