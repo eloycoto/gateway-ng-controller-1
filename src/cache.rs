@@ -6,7 +6,7 @@ pub struct LocalCache {
     cache: Vec<EnvoyExport>,
     version: u32,
     temp_cache: Vec<EnvoyExport>,
-    subscribers: Vec<Box<dyn FnMut() + Send + 'static>>,
+    subscribers: Vec<Box<dyn FnMut(Vec<EnvoyExport>) + Send + 'static>>,
 }
 
 impl LocalCache {
@@ -29,21 +29,14 @@ impl LocalCache {
         self.temp_cache.append(elements);
     }
 
-    pub fn subscribe(&mut self, cb: impl FnMut() + Send + 'static) {
+    pub fn subscribe(&mut self, cb: impl FnMut(Vec<EnvoyExport>) + Send + 'static) {
         self.subscribers.push(Box::new(cb));
     }
 
     pub fn publish(&mut self) {
         for callback in self.subscribers.iter_mut() {
-            callback();
+            callback(self.cache.clone());
         }
-    }
-
-    // @TODO check if this clone is ok here, AFAIK this should be a ref to self.cache.
-    // TODO Remove dead_code lint
-    #[allow(dead_code)]
-    pub fn read_all(&self) -> Vec<EnvoyExport> {
-        self.cache.clone()
     }
 
     pub fn release(&mut self) -> u32 {
@@ -76,13 +69,8 @@ pub fn release() -> u32 {
     cache.release()
 }
 
-pub fn subcribe_release(callback: impl FnMut() + Send + 'static) -> bool {
+pub fn subcribe_release(callback: impl FnMut(Vec<EnvoyExport>) + Send + 'static) -> bool {
     let mut cache = CACHE.lock().unwrap();
     cache.subscribe(callback);
-    true
-}
-
-// TODO unimplemented
-pub fn read_all() -> Vec<EnvoyExport> {
-    unimplemented!()
+    return true;
 }
