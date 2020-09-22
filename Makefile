@@ -10,8 +10,8 @@ OPEN_APP ?= xdg-open
 fetch_protos: ## Fetch protobuf files
 	$(Q) git submodule update --init --recursive
 
-help: ## Print this help
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+doc: ## open project documentation
+	$(Q) cargo doc --open
 
 up: ## Start docker-compose containers
 	$(DOCKER_COMPOSE) up
@@ -40,3 +40,6 @@ proxy: export SCHEME?=http
 proxy: LOCALURL=$(shell $(DOCKER_COMPOSE) port --index $(INDEX) $(SERVICE) $(PORT))
 proxy: ## Open service and port in a browser (same as proxy-info, but optionally define SCHEME and OPEN_APP)
 	$(OPEN_APP) $(SCHEME)://$(LOCALURL)
+
+help: ## Print this help
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
