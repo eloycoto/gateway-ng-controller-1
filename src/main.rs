@@ -24,15 +24,18 @@ fn intercept(req: Request<()>) -> Result<Request<()>, Status> {
 
 // @TODO review this static lifetime, does not looks correct here.
 fn initialize_config_loader() -> bool {
+    let mut initial_config = "".to_string();
     tokio::task::spawn_blocking(move || loop {
         let config = configuration::Config::parse_config("./log.json");
-        //@TODO Check md5 here to not append if does not change
-        cache::add_multiple(&mut config.export_config_to_envoy());
-        // @TODO mybe something golang ticker here? should be a better way to do this.
-        println!("Running config thread at {:?}", std::time::Instant::now());
+        // @TODO This clone here shouldn't happen
+        let config_hash = config.clone().get_hash();
+        if config_hash != initial_config {
+            println!("Updating config at {:?}", std::time::Instant::now());
+            cache::add_multiple(&mut config.export_config_to_envoy());
+            cache::release();
+            initial_config = config_hash
+        }
         std::thread::sleep(std::time::Duration::from_secs(5));
-        cache::release();
-        // println!("Finished, cache={:?}", cache);
     });
 
     true

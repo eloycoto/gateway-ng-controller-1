@@ -12,7 +12,7 @@ use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
 
 // @TODO target domain connect_timeout
 // @TODO optional fields
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Service {
     pub id: u32,
     pub hosts: Vec<std::string::String>,

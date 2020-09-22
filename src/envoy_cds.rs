@@ -1,6 +1,5 @@
 use async_stream::try_stream;
 use futures::Stream;
-use prost_types::Duration;
 use std::pin::Pin;
 use tonic::{Request, Response, Status, Streaming};
 
