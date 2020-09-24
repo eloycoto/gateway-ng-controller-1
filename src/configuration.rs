@@ -32,7 +32,7 @@ impl Config {
         return hash;
     }
 
-    pub fn get_hash(self) -> std::string::String {
+    pub fn get_hash(&self) -> std::string::String {
         return self.hash.clone();
     }
 
