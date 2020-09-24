@@ -26,14 +26,12 @@ fn intercept(req: Request<()>) -> Result<Request<()>, Status> {
 fn initialize_config_loader() -> bool {
     let mut initial_config = "".to_string();
     tokio::task::spawn_blocking(move || loop {
-        let config = configuration::Config::parse_config("./log.json");
-        // @TODO This clone here shouldn't happen
-        let config_hash = config.clone().get_hash();
-        if config_hash != initial_config {
+        let config = &configuration::Config::parse_config("./log.json");
+        if config.get_hash() != initial_config {
             println!("Updating config at {:?}", std::time::Instant::now());
             cache::add_multiple(&mut config.export_config_to_envoy());
             cache::release();
-            initial_config = config_hash
+            initial_config = config.get_hash()
         }
         std::thread::sleep(std::time::Duration::from_secs(5));
     });
