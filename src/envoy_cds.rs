@@ -3,47 +3,50 @@ use futures::Stream;
 use std::pin::Pin;
 use tonic::{Request, Response, Status, Streaming};
 
-use crate::cache;
-use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
+use crate::configuration;
+use crate::envoy_helpers;
+use std::sync::{Arc, RwLock};
+// use crate::envoy_helpers::{EnvoyExport, EnvoyResource, EnvoyService};
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
 use crate::protobuf::envoy::service::cluster::v3::cluster_discovery_service_server::ClusterDiscoveryService;
 use crate::protobuf::envoy::service::discovery::v3::{
     DeltaDiscoveryRequest, DeltaDiscoveryResponse, DiscoveryRequest, DiscoveryResponse,
 };
 
-// pub fn callback(data: Vec<EnvoyExport>) {
-//     println!("Refresh data --CDS CALLBACK",);
-// }
-
 #[derive(Debug, Clone)]
 pub struct CDS {
     clusters: Vec<Cluster>,
     version: u32,
+    config: Arc<RwLock<configuration::Config>>,
 }
 
 impl CDS {
-    pub fn new() -> CDS {
-        CDS {
+    pub fn new(config: Arc<RwLock<configuration::Config>>) -> CDS {
+        let mut cds = CDS {
             clusters: Vec::new(),
             version: 0,
-        }
+            config: config,
+        };
+        cds.refresh_data_if_needed();
+        return cds;
     }
 
-    fn refresh_data(&mut self, data: Vec<EnvoyExport>) {
+    pub fn refresh_data_if_needed(&mut self) {
+        let cfg = self.config.read().unwrap();
+        if cfg.get_version() <= self.version {
+            return;
+        }
+
         let mut new_clusters: Vec<Cluster> = Vec::new();
-        for k in &data {
+        let services = cfg.export_config_to_envoy();
+        for k in &services {
             match &k.config {
-                EnvoyResource::Cluster(c) => new_clusters.push(c.clone()),
+                envoy_helpers::EnvoyResource::Cluster(c) => new_clusters.push(c.clone()),
             }
         }
-        self.clusters = new_clusters.clone();
-        self.version += 1;
-    }
 
-    pub fn subscribe(&'_ mut self) {
-        let mut object = Box::new(self.clone());
-        let callback = move |x| object.refresh_data(x);
-        cache::subcribe_release(callback);
+        self.clusters = new_clusters.clone();
+        self.version += cfg.get_version();
     }
 }
 
@@ -67,10 +70,10 @@ impl ClusterDiscoveryService for CDS {
         _request: Request<tonic::Streaming<DiscoveryRequest>>,
     ) -> Result<Response<Self::StreamClustersStream>, Status> {
         let mut clusters: Vec<prost_types::Any> = Vec::new();
+
         for cds_cluster in &self.clusters {
             let mut buf = Vec::new();
             prost::Message::encode(cds_cluster, &mut buf).unwrap();
-
             clusters.push(prost_types::Any {
                 type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster".to_string(),
                 value: buf,

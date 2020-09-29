@@ -30,7 +30,7 @@ impl Service {
             config: EnvoyResource::Cluster(cluster),
         });
 
-        result
+        return result;
     }
 
     // TODO unimplemented
@@ -47,6 +47,7 @@ impl Service {
                 seconds: 1,
                 nanos: 0,
             }),
+            lb_policy: 0,
             load_assignment: Some(ClusterLoadAssignment {
                 cluster_name: self.target_domain.to_string(),
                 endpoints: vec![LocalityLbEndpoints {

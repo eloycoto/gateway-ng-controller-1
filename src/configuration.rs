@@ -1,4 +1,4 @@
-use crate::envoy_helpers::EnvoyExport;
+use crate::envoy_helpers::EnvoyExportList;
 use crate::service;
 use std::fs::File;
 use std::io::Read;
@@ -6,10 +6,13 @@ use std::io::Read;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 
+type ServicesList = Vec<service::Service>;
+
 #[derive(Default, Debug, Clone)]
 pub struct Config {
-    services: Vec<service::Service>,
+    services: ServicesList,
     hash: std::string::String,
+    version: u32,
 }
 
 impl Config {
@@ -61,9 +64,22 @@ impl Config {
         return contents;
     }
 
-    pub fn export_config_to_envoy(&self) -> Vec<EnvoyExport> {
+    pub fn export_config_to_envoy(&self) -> EnvoyExportList {
         let mut result = Vec::with_capacity(self.services.len());
         result.extend(self.services.iter().flat_map(service::Service::export));
         return result;
+    }
+    pub fn get_version(&self) -> u32 {
+        return self.version;
+    }
+
+    pub fn get_services(&self) -> ServicesList {
+        return self.services.clone();
+    }
+
+    pub fn import(&mut self, services: ServicesList, hash: std::string::String) {
+        self.services = services;
+        self.hash = hash;
+        self.version += 1;
     }
 }
