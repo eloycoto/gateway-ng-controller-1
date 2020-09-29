@@ -2,6 +2,11 @@ use prost_types::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
+
+// use crate::protobuf::envoy::config::core::v3::address::Address;
+use crate::protobuf::envoy::config::cluster::v3::cluster::DiscoveryType;
+use crate::protobuf::envoy::config::core::v3::Address;
+use crate::protobuf::envoy::config::core::v3::SocketAddress;
 use crate::protobuf::envoy::config::endpoint::v3::lb_endpoint::HostIdentifier;
 use crate::protobuf::envoy::config::endpoint::v3::ClusterLoadAssignment;
 use crate::protobuf::envoy::config::endpoint::v3::Endpoint;
@@ -41,18 +46,31 @@ impl Service {
     }
 
     fn export_clusters(&self) -> Cluster {
+        let socketaddress =
+            crate::protobuf::envoy::config::core::v3::address::Address::SocketAddress(
+                SocketAddress {
+                    address: self.target_domain.to_string(),
+                    resolver_name: self.target_domain.to_string(),
+                    port_specifier: Some(crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue(80)),
+                    ..Default::default()
+                },
+            );
         Cluster {
             name: self.target_domain.to_string(),
             connect_timeout: Some(Duration {
                 seconds: 1,
                 nanos: 0,
             }),
-            lb_policy: 0,
+            lb_policy: DiscoveryType::LogicalDns as i32,
             load_assignment: Some(ClusterLoadAssignment {
                 cluster_name: self.target_domain.to_string(),
                 endpoints: vec![LocalityLbEndpoints {
                     lb_endpoints: vec![LbEndpoint {
                         host_identifier: Some(HostIdentifier::Endpoint(Endpoint {
+                            address: Some(Address {
+                                address: Some(socketaddress),
+                                ..Default::default()
+                            }),
                             hostname: self.target_domain.to_string(),
                             ..Default::default()
                         })),
