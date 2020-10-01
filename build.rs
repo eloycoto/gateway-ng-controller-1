@@ -8,6 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[
             "./protos/envoyproxy/data-plane-api/envoy/config/cluster/v3/cluster.proto",
             "./protos/envoyproxy/data-plane-api/envoy/service/cluster/v3/cds.proto",
+            "./protos/envoyproxy/data-plane-api/envoy/service/listener/v3/lds.proto",
             "./protos/envoyproxy/data-plane-api/envoy/config/endpoint/v3/endpoint.proto",
         ],
         &[

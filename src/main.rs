@@ -5,6 +5,7 @@
 mod configuration;
 mod envoy_cds;
 mod envoy_helpers;
+mod envoy_lds;
 mod processor;
 mod protobuf;
 mod service;

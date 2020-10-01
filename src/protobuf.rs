@@ -62,6 +62,12 @@ pub mod envoy {
                 include!("protobuf/envoy.service.discovery.v3.rs");
             }
         }
+
+        pub mod listener {
+            pub mod v3 {
+                include!("protobuf/envoy.service.listener.v3.rs");
+            }
+        }
     }
 
     pub mod r#type {
