@@ -1,140 +1,143 @@
 // Triggered currently by config::core::v3 with the GoogleGrpc type
 #![allow(clippy::large_enum_variant)]
 
+#[path = "protobuf"]
 pub mod google {
-    pub mod api {
-        include!("protobuf/google.api.rs");
-    }
-    pub mod protobuf {
-        include!("protobuf/google.protobuf.rs");
-    }
-    pub mod rpc {
-        include!("protobuf/google.rpc.rs");
-    }
+    #[path = "google.api.rs"]
+    pub mod api;
+    #[path = "google.protobuf.rs"]
+    pub mod protobuf;
+    #[path = "google.rpc.rs"]
+    pub mod rpc;
 }
 
+#[path = "protobuf"]
 pub mod udpa {
-    pub mod annotations {
-        include!("protobuf/udpa.annotations.rs");
-    }
+    #[path = "udpa.annotations.rs"]
+    pub mod annotations;
+    #[path = "."]
     pub mod core {
-        pub mod v1 {
-            include!("protobuf/udpa.core.v1.rs");
-        }
+        #[path = "udpa.core.v1.rs"]
+        pub mod v1;
     }
 }
 
+#[path = "protobuf"]
 pub mod envoy {
+    #[path = "envoy.annotations.rs"]
+    pub mod annotations;
 
-    pub mod annotations {
-        include!("protobuf/envoy.annotations.rs");
-    }
-
+    #[path = "."]
     pub mod config {
-
+        #[path = "."]
         pub mod accesslog {
-            pub mod v3 {
-                include!("protobuf/envoy.config.accesslog.v3.rs");
-            }
+            #[path = "envoy.config.accesslog.v3.rs"]
+            pub mod v3;
         }
 
+        #[path = "."]
         pub mod core {
-            pub mod v3 {
-                include!("protobuf/envoy.config.core.v3.rs");
-            }
+            #[path = "envoy.config.core.v3.rs"]
+            pub mod v3;
         }
 
+        #[path = "."]
         pub mod cluster {
-            pub mod v3 {
-                include!("protobuf/envoy.config.cluster.v3.rs");
-            }
+            #[path = "envoy.config.cluster.v3.rs"]
+            pub mod v3;
         }
 
+        #[path = "."]
         pub mod endpoint {
-            pub mod v3 {
-                include!("protobuf/envoy.config.endpoint.v3.rs");
-            }
+            #[path = "envoy.config.endpoint.v3.rs"]
+            pub mod v3;
         }
 
+        #[path = "."]
         pub mod listener {
-            pub mod v3 {
-                include!("protobuf/envoy.config.listener.v3.rs");
-            }
+            #[path = "envoy.config.listener.v3.rs"]
+            pub mod v3;
         }
 
+        #[path = "."]
         pub mod route {
-            pub mod v3 {
-                include!("protobuf/envoy.config.route.v3.rs");
-            }
+            #[path = "envoy.config.route.v3.rs"]
+            pub mod v3;
         }
 
+        #[path = "."]
         pub mod trace {
-            pub mod v3 {
-                include!("protobuf/envoy.config.trace.v3.rs");
-            }
+            #[path = "envoy.config.trace.v3.rs"]
+            pub mod v3;
         }
     }
 
+    #[path = "."]
     pub mod extensions {
+        #[path = "."]
         pub mod filters {
+            #[path = "."]
             pub mod network {
+                #[path = "."]
                 pub mod http_connection_manager {
-                    pub mod v3 {
-                        include!("protobuf/envoy.extensions.filters.network.http_connection_manager.v3.rs");
-                    }
+                    #[path = "envoy.extensions.filters.network.http_connection_manager.v3.rs"]
+                    pub mod v3;
                 }
             }
+
+            #[path = "."]
             pub mod http {
+                #[path = "."]
                 pub mod router {
-                    pub mod v3 {
-                        include!("protobuf/envoy.extensions.filters.http.router.v3.rs");
-                    }
+                    #[path = "envoy.extensions.filters.http.router.v3.rs"]
+                    pub mod v3;
                 }
             }
         }
     }
 
+    #[path = "."]
     pub mod service {
+        #[path = "."]
         pub mod cluster {
-            pub mod v3 {
-                include!("protobuf/envoy.service.cluster.v3.rs");
-            }
+            #[path = "envoy.service.cluster.v3.rs"]
+            pub mod v3;
         }
 
+        #[path = "."]
         pub mod discovery {
-            pub mod v3 {
-                include!("protobuf/envoy.service.discovery.v3.rs");
-            }
+            #[path = "envoy.service.discovery.v3.rs"]
+            pub mod v3;
         }
 
+        #[path = "."]
         pub mod listener {
-            pub mod v3 {
-                include!("protobuf/envoy.service.listener.v3.rs");
-            }
+            #[path = "envoy.service.listener.v3.rs"]
+            pub mod v3;
         }
     }
 
+    #[path = "."]
     pub mod r#type {
+        #[path = "."]
         pub mod matcher {
-            pub mod v3 {
-                include!("protobuf/envoy.r#type.matcher.v3.rs");
-            }
+            #[path = "envoy.r#type.matcher.v3.rs"]
+            pub mod v3;
         }
 
+        #[path = "."]
         pub mod metadata {
-            pub mod v3 {
-                include!("protobuf/envoy.r#type.metadata.v3.rs");
-            }
+            #[path = "envoy.r#type.metadata.v3.rs"]
+            pub mod v3;
         }
 
+        #[path = "."]
         pub mod tracing {
-            pub mod v3 {
-                include!("protobuf/envoy.r#type.tracing.v3.rs");
-            }
+            #[path = "envoy.r#type.tracing.v3.rs"]
+            pub mod v3;
         }
 
-        pub mod v3 {
-            include!("protobuf/envoy.r#type.v3.rs");
-        }
+        #[path = "envoy.r#type.v3.rs"]
+        pub mod v3;
     }
 }
