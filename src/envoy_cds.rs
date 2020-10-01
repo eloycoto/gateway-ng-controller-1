@@ -42,6 +42,7 @@ impl CDS {
         for k in &services {
             match &k.config {
                 envoy_helpers::EnvoyResource::Cluster(c) => new_clusters.push(c.clone()),
+                envoy_helpers::EnvoyResource::Listener(_) => continue,
             }
         }
 

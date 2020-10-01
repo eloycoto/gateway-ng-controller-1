@@ -2,6 +2,7 @@ use prost_types::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
+use crate::protobuf::envoy::config::listener::v3::Listener;
 
 // use crate::protobuf::envoy::config::core::v3::address::Address;
 use crate::protobuf::envoy::config::cluster::v3::cluster::DiscoveryType;
@@ -35,14 +36,14 @@ impl Service {
             config: EnvoyResource::Cluster(cluster),
         });
 
-        return result;
-    }
+        // Listener entries
+        let listener = self.export_listener();
+        result.push(EnvoyExport {
+            key: format!("service::id::{}::listener", self.id),
+            config: EnvoyResource::Listener(listener),
+        });
 
-    // TODO unimplemented
-    // TODO Remove dead code lint.
-    #[allow(dead_code)]
-    fn export_listener(&self) -> bool {
-        unimplemented!()
+        return result;
     }
 
     fn export_clusters(&self) -> Cluster {
@@ -80,6 +81,12 @@ impl Service {
                 }],
                 ..Default::default()
             }),
+            ..Default::default()
+        }
+    }
+
+    fn export_listener(&self) -> Listener {
+        Listener {
             ..Default::default()
         }
     }

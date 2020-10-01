@@ -1,4 +1,5 @@
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
+use crate::protobuf::envoy::config::listener::v3::Listener;
 
 pub type EnvoyExportList = Vec<EnvoyExport>;
 
@@ -13,4 +14,5 @@ pub struct EnvoyExport {
 #[derive(Debug, Clone)]
 pub enum EnvoyResource {
     Cluster(Cluster),
+    Listener(Listener),
 }
