@@ -67,6 +67,24 @@ pub mod envoy {
                 include!("protobuf/envoy.config.route.v3.rs");
             }
         }
+
+        pub mod trace {
+            pub mod v3 {
+                include!("protobuf/envoy.config.trace.v3.rs");
+            }
+        }
+    }
+
+    pub mod extensions {
+        pub mod filters {
+            pub mod network {
+                pub mod http_connection_manager {
+                    pub mod v3 {
+                        include!("protobuf/envoy.extensions.filters.network.http_connection_manager.v3.rs");
+                    }
+                }
+            }
+        }
     }
 
     pub mod service {

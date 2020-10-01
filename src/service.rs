@@ -2,10 +2,13 @@ use prost_types::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
+use crate::protobuf::envoy::config::listener::v3::Filter;
+use crate::protobuf::envoy::config::listener::v3::FilterChain;
 use crate::protobuf::envoy::config::listener::v3::Listener;
 
 // use crate::protobuf::envoy::config::core::v3::address::Address;
 use crate::protobuf::envoy::config::cluster::v3::cluster::DiscoveryType;
+use crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue;
 use crate::protobuf::envoy::config::core::v3::Address;
 use crate::protobuf::envoy::config::core::v3::SocketAddress;
 use crate::protobuf::envoy::config::endpoint::v3::lb_endpoint::HostIdentifier;
@@ -87,6 +90,25 @@ impl Service {
 
     fn export_listener(&self) -> Listener {
         Listener {
+            name: format!("service {}", self.id),
+            address: Some(Address {
+                address: Some(
+                    crate::protobuf::envoy::config::core::v3::address::Address::SocketAddress(
+                        SocketAddress {
+                            address: "0.0.0.0".to_string(),
+                            port_specifier: Some(PortValue(80)),
+                            ..Default::default()
+                        },
+                    ),
+                ),
+            }),
+            filter_chains: vec![FilterChain {
+                filters: vec![Filter {
+                    name: "envoy.http_connection_manager".to_string(),
+                    ..Default::default() // config_type: Some(),
+                }],
+                ..Default::default()
+            }],
             ..Default::default()
         }
     }
