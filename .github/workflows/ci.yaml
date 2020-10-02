@@ -14,13 +14,18 @@ env:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.required }}
     strategy:
+      fail-fast: false
       matrix:
         rust:
           - stable
           - beta
-          - nightly
           #- 1.45.2 # MSRV has not been defined for this project
+        required: [true]
+        include:
+          - rust: nightly
+            required: false
 
     steps:
       - uses: actions/checkout@v2
