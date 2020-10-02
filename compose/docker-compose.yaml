@@ -1,0 +1,70 @@
+version: "2.2"
+services:
+  ingress:
+    image: istio/proxyv2:1.7.2
+    entrypoint: /bin/bash -c '/usr/local/bin/envoy -c /etc/envoy.yaml --service-cluster $$(domainname) --service-node $$(hostname)'
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy.yaml:z,ro
+    expose:
+      - "8080"
+      - "9001"
+    ports:
+      - "8080"
+      - "9001"
+    scale: 2
+    domainname: "ingress"
+    networks:
+      - ingress
+      - control-plane
+      - jaeger
+      - mesh
+
+  web:
+    image: katacoda/docker-http-server
+    expose:
+      - "80"
+    ports:
+      - "80"
+    scale: 4
+    domainname: "app"
+    networks:
+      mesh:
+        aliases:
+          - app
+
+  control-plane:
+    build:
+      context: ..
+      dockerfile: ./compose/control-plane/Dockerfile
+    image: control-plane
+    volumes:
+      - ./control-plane/config.json:/home/app/bin/log.json:z,ro
+    expose:
+      - "5000"
+    ports:
+      - "5000:5000"
+    networks:
+      - control-plane
+
+  jaeger:
+    image: jaegertracing/all-in-one
+    environment:
+      COLLECTOR_ZIPKIN_HTTP_PORT: "9411"
+    expose:
+      - "5775/udp"
+      - "6831-6832/udp"
+      - "5778"
+      - "16686"
+      - "14268"
+      - "14250"
+      - "9411"
+    ports:
+      - "16686:16686"
+    networks:
+      - jaeger
+
+networks:
+  control-plane:
+  ingress:
+  mesh:
+  jaeger:

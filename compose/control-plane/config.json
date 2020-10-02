@@ -1,0 +1,8 @@
+[
+  {
+    "id": 1,
+    "hosts": ["web"],
+    "policies": [],
+    "target_domain": "web.app:80"
+  }
+]

@@ -1,0 +1,56 @@
+dynamic_resources:
+  cds_config:
+    api_config_source:
+      api_type: grpc
+      grpc_services:
+        - envoy_grpc:
+            cluster_name: xds_cluster
+
+static_resources:
+  clusters:
+    - name: xds_cluster
+      connect_timeout: 0.25s
+      type: strict_dns
+      lb_policy: round_robin
+      http2_protocol_options: {}
+      upstream_connection_options:
+        # configure a TCP keep-alive to detect and reconnect to the admin
+        # server in the event of a TCP socket half open connection
+        tcp_keepalive: {}
+      load_assignment:
+        cluster_name: xds_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: control-plane
+                  port_value: 443
+    - name: jaeger
+      connect_timeout: 0.5s
+      type: strict_dns
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: jaeger
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: jaeger
+                  port_value: 9411
+                  protocol: tcp
+
+tracing:
+  http:
+    name: envoy.tracers.zipkin
+    config:
+      collector_cluster: jaeger
+      collector_endpoint: "/api/v1/spans"
+
+admin:
+  access_log_path: /dev/stdout
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9001
