@@ -6,6 +6,10 @@ on:
       - '**/Cargo.lock'
     branches-ignore:
       - '**.tmp'
+  pull_request:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
 
 jobs:
   audit_check:
