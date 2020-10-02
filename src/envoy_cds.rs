@@ -85,7 +85,6 @@ impl ClusterDiscoveryService for CDS {
             version_info: self.version.to_string(),
             type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster".to_string(),
             resources: clusters,
-            nonce: "nonce".to_string(),
             ..Default::default()
         };
 

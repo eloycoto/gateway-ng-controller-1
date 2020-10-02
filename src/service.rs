@@ -1,23 +1,32 @@
 use prost_types::Duration;
 use serde::{Deserialize, Serialize};
 
-use crate::protobuf::envoy::config::cluster::v3::Cluster;
-use crate::protobuf::envoy::config::listener::v3::Filter;
-use crate::protobuf::envoy::config::listener::v3::FilterChain;
-use crate::protobuf::envoy::config::listener::v3::Listener;
+use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
 
-// use crate::protobuf::envoy::config::core::v3::address::Address;
-use crate::protobuf::envoy::config::cluster::v3::cluster::DiscoveryType;
-use crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue;
+use crate::protobuf::envoy::config::cluster::v3::Cluster;
+use crate::protobuf::envoy::config::cluster::v3::cluster::ClusterDiscoveryType;
 use crate::protobuf::envoy::config::core::v3::Address;
 use crate::protobuf::envoy::config::core::v3::SocketAddress;
-use crate::protobuf::envoy::config::endpoint::v3::lb_endpoint::HostIdentifier;
+use crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue;
 use crate::protobuf::envoy::config::endpoint::v3::ClusterLoadAssignment;
 use crate::protobuf::envoy::config::endpoint::v3::Endpoint;
 use crate::protobuf::envoy::config::endpoint::v3::LbEndpoint;
 use crate::protobuf::envoy::config::endpoint::v3::LocalityLbEndpoints;
-
-use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
+use crate::protobuf::envoy::config::endpoint::v3::lb_endpoint::HostIdentifier;
+use crate::protobuf::envoy::config::listener::v3::Filter;
+use crate::protobuf::envoy::config::listener::v3::FilterChain;
+use crate::protobuf::envoy::config::listener::v3::Listener;
+use crate::protobuf::envoy::config::listener::v3::filter::ConfigType;
+use crate::protobuf::envoy::config::route::v3::Route;
+use crate::protobuf::envoy::config::route::v3::RouteAction;
+use crate::protobuf::envoy::config::route::v3::RouteConfiguration;
+use crate::protobuf::envoy::config::route::v3::RouteMatch;
+use crate::protobuf::envoy::config::route::v3::VirtualHost;
+use crate::protobuf::envoy::config::route::v3::route::Action;
+use crate::protobuf::envoy::config::route::v3::route_action::ClusterSpecifier;
+use crate::protobuf::envoy::config::route::v3::route_match::PathSpecifier;
+use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
+use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_connection_manager::RouteSpecifier;
 
 // @TODO target domain connect_timeout
 // @TODO optional fields
@@ -54,7 +63,7 @@ impl Service {
             crate::protobuf::envoy::config::core::v3::address::Address::SocketAddress(
                 SocketAddress {
                     address: self.target_domain.to_string(),
-                    resolver_name: self.target_domain.to_string(),
+                    // resolver_name: self.target_domain.to_string(),
                     port_specifier: Some(crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue(80)),
                     ..Default::default()
                 },
@@ -65,7 +74,8 @@ impl Service {
                 seconds: 1,
                 nanos: 0,
             }),
-            lb_policy: DiscoveryType::LogicalDns as i32,
+            cluster_discovery_type: Some(ClusterDiscoveryType::Type(2)),
+            // lb_policy: DiscoveryType::LogicalDns(),
             load_assignment: Some(ClusterLoadAssignment {
                 cluster_name: self.target_domain.to_string(),
                 endpoints: vec![LocalityLbEndpoints {
@@ -89,6 +99,49 @@ impl Service {
     }
 
     fn export_listener(&self) -> Listener {
+        let mut filters = Vec::new();
+
+        let connection_manager = HttpConnectionManager {
+            stat_prefix: "ingress_http".to_string(),
+            codec_type: 0,
+            route_specifier: Some(RouteSpecifier::RouteConfig(RouteConfiguration {
+                name: format!("service_{:?}_route", self.id),
+                virtual_hosts: vec![VirtualHost {
+                    name: format!("service_{:?}_vhost", self.id),
+                    domains: self.hosts.clone(),
+                    routes: vec![Route {
+                        r#match: Some(RouteMatch {
+                            path_specifier: Some(PathSpecifier::Prefix("/".to_string())),
+                            ..Default::default()
+                        }),
+                        action: Some(Action::Route(RouteAction {
+                            cluster_specifier: Some(ClusterSpecifier::Cluster(
+                                self.target_domain.to_string(),
+                            )),
+                            ..Default::default()
+                        })),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            })),
+            ..Default::default()
+        };
+
+        let mut buf = Vec::new();
+        prost::Message::encode(&connection_manager, &mut buf).unwrap();
+
+        let config = prost_types::Any {
+            type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager".to_string(),
+            value: buf,
+        };
+
+        filters.push(Filter {
+            name: "envoy.http_connection_manager".to_string(),
+            config_type: Some(ConfigType::TypedConfig(config)),
+        });
+
         Listener {
             name: format!("service {}", self.id),
             address: Some(Address {
@@ -103,10 +156,7 @@ impl Service {
                 ),
             }),
             filter_chains: vec![FilterChain {
-                filters: vec![Filter {
-                    name: "envoy.http_connection_manager".to_string(),
-                    ..Default::default() // config_type: Some(),
-                }],
+                filters: filters,
                 ..Default::default()
             }],
             ..Default::default()

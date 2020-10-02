@@ -92,7 +92,7 @@ impl ListenerDiscoveryService for LDS {
             version_info: self.version.to_string(),
             type_url: "type.googleapis.com/envoy.config.listener.v3.Listener".to_string(),
             resources: listeners,
-            nonce: "nonce".to_string(),
+            // nonce: "nonce".to_string(),
             ..Default::default()
         };
 
