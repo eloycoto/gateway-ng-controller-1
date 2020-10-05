@@ -1,12 +1,11 @@
-use async_stream::try_stream;
-use futures::Stream;
 use std::pin::Pin;
+use std::sync::{Arc, RwLock};
+use std::task::{Context, Poll};
+use tokio::stream::Stream;
 use tonic::{Request, Response, Status, Streaming};
 
 use crate::configuration;
 use crate::envoy_helpers;
-use std::sync::{Arc, RwLock};
-// use crate::envoy_helpers::{EnvoyExport, EnvoyResource, EnvoyService};
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
 use crate::protobuf::envoy::service::cluster::v3::cluster_discovery_service_server::ClusterDiscoveryService;
 use crate::protobuf::envoy::service::discovery::v3::{
@@ -18,6 +17,7 @@ pub struct CDS {
     clusters: Vec<Cluster>,
     version: u32,
     config: Arc<RwLock<configuration::Config>>,
+    init: bool,
 }
 
 impl CDS {
@@ -26,6 +26,7 @@ impl CDS {
             clusters: Vec::new(),
             version: 0,
             config: config,
+            init: true,
         };
         cds.refresh_data_if_needed();
         return cds;
@@ -48,6 +49,40 @@ impl CDS {
 
         self.clusters = new_clusters.clone();
         self.version += cfg.get_version();
+        self.init = true;
+    }
+}
+
+impl tokio::stream::Stream for CDS {
+    type Item = Result<DiscoveryResponse, tonic::Status>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut Context<'_>,
+    ) -> Poll<Option<Result<DiscoveryResponse, tonic::Status>>> {
+        if self.init == false {
+            return Poll::Pending;
+        }
+        self.init = false;
+        let mut clusters: Vec<prost_types::Any> = Vec::new();
+
+        for cds_cluster in &self.clusters {
+            let mut buf = Vec::new();
+            prost::Message::encode(cds_cluster, &mut buf).unwrap();
+            clusters.push(prost_types::Any {
+                type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster".to_string(),
+                value: buf,
+            });
+        }
+
+        let discovery = DiscoveryResponse {
+            version_info: self.version.to_string(),
+            type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster".to_string(),
+            resources: clusters,
+            ..Default::default()
+        };
+
+        return Poll::Ready(Some(Ok(discovery)));
     }
 }
 
@@ -70,29 +105,9 @@ impl ClusterDiscoveryService for CDS {
         &self,
         _request: Request<tonic::Streaming<DiscoveryRequest>>,
     ) -> Result<Response<Self::StreamClustersStream>, Status> {
-        let mut clusters: Vec<prost_types::Any> = Vec::new();
-
-        for cds_cluster in &self.clusters {
-            let mut buf = Vec::new();
-            prost::Message::encode(cds_cluster, &mut buf).unwrap();
-            clusters.push(prost_types::Any {
-                type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster".to_string(),
-                value: buf,
-            });
-        }
-
-        let discovery = DiscoveryResponse {
-            version_info: self.version.to_string(),
-            type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster".to_string(),
-            resources: clusters,
-            ..Default::default()
-        };
-
-        let output = try_stream! {
-           yield discovery.clone();
-        };
-
-        Ok(Response::new(Box::pin(output) as Self::StreamClustersStream))
+        Ok(Response::new(
+            Box::pin(self.clone()) as Self::StreamClustersStream
+        ))
     }
 
     async fn delta_clusters(
