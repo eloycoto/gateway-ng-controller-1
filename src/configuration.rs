@@ -24,19 +24,19 @@ impl Config {
         let raw_config = config.read_path(path);
         config.set_hash(&raw_config);
         config.parse_json(raw_config);
-        return config;
+        config
     }
 
-    fn set_hash(&mut self, content: &std::string::String) -> u64 {
+    fn set_hash(&mut self, content: &str) -> u64 {
         let mut hasher = DefaultHasher::new();
         hasher.write(content.as_bytes());
         let hash = hasher.finish();
         self.hash = format!("{:x}", hash);
-        return hash;
+        hash
     }
 
     pub fn get_hash(&self) -> std::string::String {
-        return self.hash.clone();
+        self.hash.clone()
     }
 
     fn parse_json(&mut self, raw_config: std::string::String) {
@@ -61,20 +61,20 @@ impl Config {
         file.read_to_string(&mut contents)
             .expect("Error reading the file");
 
-        return contents;
+        contents
     }
 
     pub fn export_config_to_envoy(&self) -> EnvoyExportList {
         let mut result = Vec::with_capacity(self.services.len());
         result.extend(self.services.iter().flat_map(service::Service::export));
-        return result;
+        result
     }
     pub fn get_version(&self) -> u32 {
-        return self.version;
+        self.version
     }
 
     pub fn get_services(&self) -> ServicesList {
-        return self.services.clone();
+        self.services.clone()
     }
 
     pub fn import(&mut self, services: ServicesList, hash: std::string::String) {

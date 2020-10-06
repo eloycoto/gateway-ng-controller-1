@@ -55,7 +55,10 @@ impl Service {
             config: EnvoyResource::Listener(listener),
         });
 
-        return result;
+        result
+    }
+    fn cluster_name(&self) -> std::string::String {
+        return format!("Cluster::service::{}", self.id);
     }
 
     fn export_clusters(&self) -> Cluster {
@@ -64,12 +67,12 @@ impl Service {
                 SocketAddress {
                     address: self.target_domain.to_string(),
                     // resolver_name: self.target_domain.to_string(),
-                    port_specifier: Some(crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue(80)),
+                    port_specifier: Some(crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue(10000)),
                     ..Default::default()
                 },
             );
         Cluster {
-            name: self.target_domain.to_string(),
+            name: self.cluster_name(),
             connect_timeout: Some(Duration {
                 seconds: 1,
                 nanos: 0,
@@ -77,13 +80,12 @@ impl Service {
             cluster_discovery_type: Some(ClusterDiscoveryType::Type(2)),
             // lb_policy: DiscoveryType::LogicalDns(),
             load_assignment: Some(ClusterLoadAssignment {
-                cluster_name: self.target_domain.to_string(),
+                cluster_name: self.cluster_name(),
                 endpoints: vec![LocalityLbEndpoints {
                     lb_endpoints: vec![LbEndpoint {
                         host_identifier: Some(HostIdentifier::Endpoint(Endpoint {
                             address: Some(Address {
                                 address: Some(socketaddress),
-                                ..Default::default()
                             }),
                             hostname: self.target_domain.to_string(),
                             ..Default::default()
@@ -115,9 +117,7 @@ impl Service {
                             ..Default::default()
                         }),
                         action: Some(Action::Route(RouteAction {
-                            cluster_specifier: Some(ClusterSpecifier::Cluster(
-                                self.target_domain.to_string(),
-                            )),
+                            cluster_specifier: Some(ClusterSpecifier::Cluster(self.cluster_name())),
                             ..Default::default()
                         })),
                         ..Default::default()
@@ -156,7 +156,7 @@ impl Service {
                 ),
             }),
             filter_chains: vec![FilterChain {
-                filters: filters,
+                filters,
                 ..Default::default()
             }],
             ..Default::default()

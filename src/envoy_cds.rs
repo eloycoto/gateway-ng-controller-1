@@ -25,11 +25,11 @@ impl CDS {
         let mut cds = CDS {
             clusters: Vec::new(),
             version: 0,
-            config: config,
+            config,
             init: true,
         };
         cds.refresh_data_if_needed();
-        return cds;
+        cds
     }
 
     pub fn refresh_data_if_needed(&mut self) {
@@ -47,7 +47,7 @@ impl CDS {
             }
         }
 
-        self.clusters = new_clusters.clone();
+        self.clusters = new_clusters;
         self.version += cfg.get_version();
         self.init = true;
     }
@@ -60,7 +60,7 @@ impl tokio::stream::Stream for CDS {
         mut self: std::pin::Pin<&mut Self>,
         _: &mut Context<'_>,
     ) -> Poll<Option<Result<DiscoveryResponse, tonic::Status>>> {
-        if self.init == false {
+        if !self.init {
             return Poll::Pending;
         }
         self.init = false;
@@ -82,7 +82,7 @@ impl tokio::stream::Stream for CDS {
             ..Default::default()
         };
 
-        return Poll::Ready(Some(Ok(discovery)));
+        Poll::Ready(Some(Ok(discovery)))
     }
 }
 

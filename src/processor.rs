@@ -57,7 +57,7 @@ impl MasterProcess {
             let cds = envoy_cds::CDS::new(Arc::clone(&self.config));
             let lds = envoy_lds::LDS::new(Arc::clone(&self.config));
 
-            let res = Server::builder()
+            Server::builder()
                 .add_service(ClusterDiscoveryServiceServer::with_interceptor(
                     cds, intercept,
                 ))
@@ -65,8 +65,7 @@ impl MasterProcess {
                     lds, intercept,
                 ))
                 .serve(addr)
-                .await;
-            return res;
+                .await
         }
     }
 }
