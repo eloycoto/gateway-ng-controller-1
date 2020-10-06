@@ -25,7 +25,7 @@ static_resources:
               address:
                 socket_address:
                   address: control-plane
-                  port_value: 443
+                  port_value: 5000
     - name: jaeger
       connect_timeout: 0.5s
       type: strict_dns
