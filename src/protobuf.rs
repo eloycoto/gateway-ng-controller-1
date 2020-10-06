@@ -84,6 +84,13 @@ pub mod envoy {
                     }
                 }
             }
+            pub mod http {
+                pub mod router {
+                    pub mod v3 {
+                        include!("protobuf/envoy.extensions.filters.http.router.v3.rs");
+                    }
+                }
+            }
         }
     }
 

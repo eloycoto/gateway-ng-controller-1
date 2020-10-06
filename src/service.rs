@@ -26,7 +26,10 @@ use crate::protobuf::envoy::config::route::v3::route::Action;
 use crate::protobuf::envoy::config::route::v3::route_action::ClusterSpecifier;
 use crate::protobuf::envoy::config::route::v3::route_match::PathSpecifier;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
+use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
+use crate::protobuf::envoy::extensions::filters::http::router::v3::Router;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_connection_manager::RouteSpecifier;
+use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_filter;
 
 // @TODO target domain connect_timeout
 // @TODO optional fields
@@ -67,7 +70,7 @@ impl Service {
                 SocketAddress {
                     address: self.target_domain.to_string(),
                     // resolver_name: self.target_domain.to_string(),
-                    port_specifier: Some(crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue(10000)),
+                    port_specifier: Some(crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue(80)),
                     ..Default::default()
                 },
             );
@@ -87,7 +90,7 @@ impl Service {
                             address: Some(Address {
                                 address: Some(socketaddress),
                             }),
-                            hostname: self.target_domain.to_string(),
+                            // hostname: self.target_domain.to_string(),
                             ..Default::default()
                         })),
                         ..Default::default()
@@ -103,9 +106,29 @@ impl Service {
     fn export_listener(&self) -> Listener {
         let mut filters = Vec::new();
 
+        // @TODO no way, move this to a function or something.
+        let mut buf = Vec::new();
+        prost::Message::encode(
+            &Router {
+                ..Default::default()
+            },
+            &mut buf,
+        )
+        .unwrap();
+
+        let config = prost_types::Any {
+            type_url: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+                .to_string(),
+            value: buf,
+        };
+
         let connection_manager = HttpConnectionManager {
             stat_prefix: "ingress_http".to_string(),
             codec_type: 0,
+            http_filters: vec![HttpFilter {
+                name: "envoy.filters.http.router".to_string(),
+                config_type: Some(http_filter::ConfigType::TypedConfig(config)),
+            }],
             route_specifier: Some(RouteSpecifier::RouteConfig(RouteConfiguration {
                 name: format!("service_{:?}_route", self.id),
                 virtual_hosts: vec![VirtualHost {
@@ -138,7 +161,7 @@ impl Service {
         };
 
         filters.push(Filter {
-            name: "envoy.http_connection_manager".to_string(),
+            name: "envoy.filters.network.http_connection_manager".to_string(),
             config_type: Some(ConfigType::TypedConfig(config)),
         });
 
