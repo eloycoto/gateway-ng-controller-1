@@ -1,15 +1,15 @@
-use crate::protobuf::envoy::service::discovery::v3::{
-    DeltaDiscoveryRequest, DeltaDiscoveryResponse, DiscoveryRequest, DiscoveryResponse,
-};
-use async_stream::try_stream;
-use futures::Stream;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
+use std::task::{Context, Poll};
+use tokio::stream::Stream;
 use tonic::{Request, Response, Status, Streaming};
 
 use crate::configuration;
 use crate::envoy_helpers;
 use crate::protobuf::envoy::config::listener::v3::Listener;
+use crate::protobuf::envoy::service::discovery::v3::{
+    DeltaDiscoveryRequest, DeltaDiscoveryResponse, DiscoveryRequest, DiscoveryResponse,
+};
 use crate::protobuf::envoy::service::listener::v3::listener_discovery_service_server::ListenerDiscoveryService;
 
 #[derive(Debug, Clone)]
@@ -17,6 +17,7 @@ pub struct LDS {
     listeners: Vec<Listener>,
     version: u32,
     config: Arc<RwLock<configuration::Config>>,
+    init: bool,
 }
 
 impl LDS {
@@ -25,6 +26,7 @@ impl LDS {
             listeners: Vec::new(),
             version: 0,
             config: config,
+            init: true,
         };
         lds.refresh_data_if_needed();
         return lds;
@@ -47,6 +49,40 @@ impl LDS {
 
         self.listeners = new_listeners.clone();
         self.version += cfg.get_version();
+    }
+}
+
+impl tokio::stream::Stream for LDS {
+    type Item = Result<DiscoveryResponse, tonic::Status>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut Context<'_>,
+    ) -> Poll<Option<Result<DiscoveryResponse, tonic::Status>>> {
+        if self.init == false {
+            return Poll::Pending;
+        }
+        self.init = false;
+
+        let mut listeners: Vec<prost_types::Any> = Vec::new();
+
+        for listener in &self.listeners {
+            let mut buf = Vec::new();
+            prost::Message::encode(listener, &mut buf).unwrap();
+            listeners.push(prost_types::Any {
+                type_url: "type.googleapis.com/envoy.config.listener.v3.Listener".to_string(),
+                value: buf,
+            });
+        }
+
+        let discovery = DiscoveryResponse {
+            version_info: self.version.to_string(),
+            type_url: "type.googleapis.com/envoy.config.listener.v3.Listener".to_string(),
+            resources: listeners,
+            ..Default::default()
+        };
+
+        return Poll::Ready(Some(Ok(discovery)));
     }
 }
 
@@ -77,32 +113,9 @@ impl ListenerDiscoveryService for LDS {
         &self,
         _request: Request<tonic::Streaming<DiscoveryRequest>>,
     ) -> Result<Response<Self::StreamListenersStream>, Status> {
-        let mut listeners: Vec<prost_types::Any> = Vec::new();
-
-        for listener in &self.listeners {
-            let mut buf = Vec::new();
-            prost::Message::encode(listener, &mut buf).unwrap();
-            listeners.push(prost_types::Any {
-                type_url: "type.googleapis.com/envoy.config.listener.v3.Listener".to_string(),
-                value: buf,
-            });
-        }
-
-        let discovery = DiscoveryResponse {
-            version_info: self.version.to_string(),
-            type_url: "type.googleapis.com/envoy.config.listener.v3.Listener".to_string(),
-            resources: listeners,
-            // nonce: "nonce".to_string(),
-            ..Default::default()
-        };
-
-        let output = try_stream! {
-           yield discovery.clone();
-        };
-
-        return Ok(Response::new(
-            Box::pin(output) as Self::StreamListenersStream
-        ));
+        Ok(Response::new(
+            Box::pin(self.clone()) as Self::StreamListenersStream
+        ))
     }
 
     async fn fetch_listeners(
