@@ -6,30 +6,30 @@ use tonic::{Request, Response, Status, Streaming};
 
 use crate::configuration;
 use crate::envoy_helpers;
-use crate::protobuf::envoy::config::cluster::v3::Cluster;
-use crate::protobuf::envoy::service::cluster::v3::cluster_discovery_service_server::ClusterDiscoveryService;
+use crate::protobuf::envoy::config::listener::v3::Listener;
 use crate::protobuf::envoy::service::discovery::v3::{
     DeltaDiscoveryRequest, DeltaDiscoveryResponse, DiscoveryRequest, DiscoveryResponse,
 };
+use crate::protobuf::envoy::service::listener::v3::listener_discovery_service_server::ListenerDiscoveryService;
 
 #[derive(Debug, Clone)]
-pub struct CDS {
-    clusters: Vec<Cluster>,
+pub struct LDS {
+    listeners: Vec<Listener>,
     version: u32,
     config: Arc<RwLock<configuration::Config>>,
     init: bool,
 }
 
-impl CDS {
-    pub fn new(config: Arc<RwLock<configuration::Config>>) -> CDS {
-        let mut cds = CDS {
-            clusters: Vec::new(),
+impl LDS {
+    pub fn new(config: Arc<RwLock<configuration::Config>>) -> LDS {
+        let mut lds = LDS {
+            listeners: Vec::new(),
             version: 0,
             config,
             init: true,
         };
-        cds.refresh_data_if_needed();
-        cds
+        lds.refresh_data_if_needed();
+        lds
     }
 
     pub fn refresh_data_if_needed(&mut self) {
@@ -38,22 +38,21 @@ impl CDS {
             return;
         }
 
-        let mut new_clusters: Vec<Cluster> = Vec::new();
+        let mut new_listeners: Vec<Listener> = Vec::new();
         let services = cfg.export_config_to_envoy();
         for k in &services {
             match &k.config {
-                envoy_helpers::EnvoyResource::Cluster(c) => new_clusters.push(c.clone()),
-                envoy_helpers::EnvoyResource::Listener(_) => continue,
+                envoy_helpers::EnvoyResource::Cluster(_) => continue,
+                envoy_helpers::EnvoyResource::Listener(l) => new_listeners.push(l.clone()),
             }
         }
 
-        self.clusters = new_clusters;
+        self.listeners = new_listeners;
         self.version += cfg.get_version();
-        self.init = true;
     }
 }
 
-impl tokio::stream::Stream for CDS {
+impl tokio::stream::Stream for LDS {
     type Item = Result<DiscoveryResponse, tonic::Status>;
 
     fn poll_next(
@@ -64,21 +63,22 @@ impl tokio::stream::Stream for CDS {
             return Poll::Pending;
         }
         self.init = false;
-        let mut clusters: Vec<prost_types::Any> = Vec::new();
 
-        for cds_cluster in &self.clusters {
+        let mut listeners: Vec<prost_types::Any> = Vec::new();
+
+        for listener in &self.listeners {
             let mut buf = Vec::new();
-            prost::Message::encode(cds_cluster, &mut buf).unwrap();
-            clusters.push(prost_types::Any {
-                type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster".to_string(),
+            prost::Message::encode(listener, &mut buf).unwrap();
+            listeners.push(prost_types::Any {
+                type_url: "type.googleapis.com/envoy.config.listener.v3.Listener".to_string(),
                 value: buf,
             });
         }
 
         let discovery = DiscoveryResponse {
             version_info: self.version.to_string(),
-            type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster".to_string(),
-            resources: clusters,
+            type_url: "type.googleapis.com/envoy.config.listener.v3.Listener".to_string(),
+            resources: listeners,
             ..Default::default()
         };
 
@@ -87,12 +87,8 @@ impl tokio::stream::Stream for CDS {
 }
 
 #[tonic::async_trait]
-impl ClusterDiscoveryService for CDS {
-    type StreamClustersStream = Pin<
-        Box<dyn Stream<Item = Result<DiscoveryResponse, tonic::Status>> + Send + Sync + 'static>,
-    >;
-
-    type DeltaClustersStream = Pin<
+impl ListenerDiscoveryService for LDS {
+    type DeltaListenersStream = Pin<
         Box<
             dyn Stream<Item = Result<DeltaDiscoveryResponse, tonic::Status>>
                 + Send
@@ -101,28 +97,32 @@ impl ClusterDiscoveryService for CDS {
         >,
     >;
 
-    async fn stream_clusters(
-        &self,
-        _request: Request<tonic::Streaming<DiscoveryRequest>>,
-    ) -> Result<Response<Self::StreamClustersStream>, Status> {
-        Ok(Response::new(
-            Box::pin(self.clone()) as Self::StreamClustersStream
-        ))
-    }
+    type StreamListenersStream = Pin<
+        Box<dyn Stream<Item = Result<DiscoveryResponse, tonic::Status>> + Send + Sync + 'static>,
+    >;
 
-    async fn delta_clusters(
+    async fn delta_listeners(
         &self,
         _request: Request<Streaming<DeltaDiscoveryRequest>>,
-    ) -> Result<Response<Self::DeltaClustersStream>, Status> {
-        println!("Delta cluster");
+    ) -> Result<Response<Self::DeltaListenersStream>, Status> {
+        println!("Delta listener");
         Err(Status::unimplemented("not implemented"))
     }
 
-    async fn fetch_clusters(
+    async fn stream_listeners(
+        &self,
+        _request: Request<tonic::Streaming<DiscoveryRequest>>,
+    ) -> Result<Response<Self::StreamListenersStream>, Status> {
+        Ok(Response::new(
+            Box::pin(self.clone()) as Self::StreamListenersStream
+        ))
+    }
+
+    async fn fetch_listeners(
         &self,
         _request: Request<DiscoveryRequest>,
     ) -> Result<Response<DiscoveryResponse>, Status> {
-        println!("Fetch_cluster");
+        println!("Fetch_listener");
         Err(Status::unimplemented("not implemented"))
     }
 }

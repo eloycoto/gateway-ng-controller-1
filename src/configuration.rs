@@ -1,21 +1,42 @@
-use crate::envoy_helpers::EnvoyExport;
+use crate::envoy_helpers::EnvoyExportList;
 use crate::service;
 use std::fs::File;
 use std::io::Read;
 
-#[derive(Default, Debug)]
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hasher;
+
+type ServicesList = Vec<service::Service>;
+
+#[derive(Default, Debug, Clone)]
 pub struct Config {
-    services: Vec<service::Service>,
+    services: ServicesList,
+    hash: std::string::String,
+    version: u32,
 }
 
 impl Config {
     pub fn parse_config(path: &str) -> Config {
         let mut config = Config {
             services: Vec::new(),
+            ..Default::default()
         };
         let raw_config = config.read_path(path);
+        config.set_hash(&raw_config);
         config.parse_json(raw_config);
         config
+    }
+
+    fn set_hash(&mut self, content: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        hasher.write(content.as_bytes());
+        let hash = hasher.finish();
+        self.hash = format!("{:x}", hash);
+        hash
+    }
+
+    pub fn get_hash(&self) -> std::string::String {
+        self.hash.clone()
     }
 
     fn parse_json(&mut self, raw_config: std::string::String) {
@@ -43,9 +64,22 @@ impl Config {
         contents
     }
 
-    pub fn export_config_to_envoy(&self) -> Vec<EnvoyExport> {
+    pub fn export_config_to_envoy(&self) -> EnvoyExportList {
         let mut result = Vec::with_capacity(self.services.len());
         result.extend(self.services.iter().flat_map(service::Service::export));
         result
+    }
+    pub fn get_version(&self) -> u32 {
+        self.version
+    }
+
+    pub fn get_services(&self) -> ServicesList {
+        self.services.clone()
+    }
+
+    pub fn import(&mut self, services: ServicesList, hash: std::string::String) {
+        self.services = services;
+        self.hash = hash;
+        self.version += 1;
     }
 }

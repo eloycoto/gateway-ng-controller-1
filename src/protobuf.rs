@@ -31,6 +31,13 @@ pub mod envoy {
     }
 
     pub mod config {
+
+        pub mod accesslog {
+            pub mod v3 {
+                include!("protobuf/envoy.config.accesslog.v3.rs");
+            }
+        }
+
         pub mod core {
             pub mod v3 {
                 include!("protobuf/envoy.config.core.v3.rs");
@@ -48,6 +55,43 @@ pub mod envoy {
                 include!("protobuf/envoy.config.endpoint.v3.rs");
             }
         }
+
+        pub mod listener {
+            pub mod v3 {
+                include!("protobuf/envoy.config.listener.v3.rs");
+            }
+        }
+
+        pub mod route {
+            pub mod v3 {
+                include!("protobuf/envoy.config.route.v3.rs");
+            }
+        }
+
+        pub mod trace {
+            pub mod v3 {
+                include!("protobuf/envoy.config.trace.v3.rs");
+            }
+        }
+    }
+
+    pub mod extensions {
+        pub mod filters {
+            pub mod network {
+                pub mod http_connection_manager {
+                    pub mod v3 {
+                        include!("protobuf/envoy.extensions.filters.network.http_connection_manager.v3.rs");
+                    }
+                }
+            }
+            pub mod http {
+                pub mod router {
+                    pub mod v3 {
+                        include!("protobuf/envoy.extensions.filters.http.router.v3.rs");
+                    }
+                }
+            }
+        }
     }
 
     pub mod service {
@@ -62,6 +106,12 @@ pub mod envoy {
                 include!("protobuf/envoy.service.discovery.v3.rs");
             }
         }
+
+        pub mod listener {
+            pub mod v3 {
+                include!("protobuf/envoy.service.listener.v3.rs");
+            }
+        }
     }
 
     pub mod r#type {
@@ -70,6 +120,19 @@ pub mod envoy {
                 include!("protobuf/envoy.r#type.matcher.v3.rs");
             }
         }
+
+        pub mod metadata {
+            pub mod v3 {
+                include!("protobuf/envoy.r#type.metadata.v3.rs");
+            }
+        }
+
+        pub mod tracing {
+            pub mod v3 {
+                include!("protobuf/envoy.r#type.tracing.v3.rs");
+            }
+        }
+
         pub mod v3 {
             include!("protobuf/envoy.r#type.v3.rs");
         }
