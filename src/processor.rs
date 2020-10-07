@@ -40,14 +40,6 @@ impl MasterProcess {
             //@TODO to delete  this wait until process start.
             std::thread::sleep(std::time::Duration::from_secs(3));
 
-            //@TODO remove this debug section.
-            let cfg = self.config.read().unwrap();
-            println!(
-                "Config--GetServices {:?} {:?}",
-                cfg.get_services(),
-                cfg.get_version()
-            );
-
             fn intercept(req: Request<()>) -> Result<Request<()>, Status> {
                 println!("Intercepting request: {:?}", req);
                 Ok(req)
