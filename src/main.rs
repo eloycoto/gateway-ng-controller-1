@@ -1,4 +1,3 @@
-//#![warn(clippy::all)]
 #![deny(clippy::all)]
 
 // use crate::envoy_cds::CDS;
@@ -7,6 +6,9 @@ mod envoy_cds;
 mod envoy_helpers;
 mod envoy_lds;
 mod processor;
+// rustfmt stable will break down with #[path = "..."] in modules, so skip
+// this module for now. See https://github.com/rust-lang/rustfmt/issues/4446.
+#[rustfmt::skip]
 mod protobuf;
 mod service;
 
