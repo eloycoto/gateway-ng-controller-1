@@ -17,22 +17,18 @@ pub struct LDS {
     listeners: Vec<Listener>,
     version: u32,
     config: Arc<RwLock<configuration::Config>>,
-    init: bool,
 }
 
 impl LDS {
     pub fn new(config: Arc<RwLock<configuration::Config>>) -> LDS {
-        let mut lds = LDS {
+        LDS {
             listeners: Vec::new(),
             version: 0,
             config,
-            init: true,
-        };
-        lds.refresh_data_if_needed();
-        lds
+        }
     }
 
-    pub fn refresh_data_if_needed(&mut self) {
+    pub fn refresh_data(&mut self) {
         let cfg = self.config.read().unwrap();
         if cfg.get_version() <= self.version {
             return;
@@ -59,11 +55,14 @@ impl tokio::stream::Stream for LDS {
         mut self: std::pin::Pin<&mut Self>,
         _: &mut Context<'_>,
     ) -> Poll<Option<Result<DiscoveryResponse, tonic::Status>>> {
-        if !self.init {
-            return Poll::Pending;
+        {
+            let cfg = self.config.clone();
+            let version = cfg.read().unwrap().get_version();
+            if self.version == version {
+                return Poll::Pending;
+            }
         }
-        self.init = false;
-
+        self.refresh_data();
         let mut listeners: Vec<prost_types::Any> = Vec::new();
 
         for listener in &self.listeners {

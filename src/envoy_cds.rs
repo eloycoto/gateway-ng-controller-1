@@ -17,22 +17,18 @@ pub struct CDS {
     clusters: Vec<Cluster>,
     version: u32,
     config: Arc<RwLock<configuration::Config>>,
-    init: bool,
 }
 
 impl CDS {
     pub fn new(config: Arc<RwLock<configuration::Config>>) -> CDS {
-        let mut cds = CDS {
+        CDS {
             clusters: Vec::new(),
             version: 0,
             config,
-            init: true,
-        };
-        cds.refresh_data_if_needed();
-        cds
+        }
     }
 
-    pub fn refresh_data_if_needed(&mut self) {
+    pub fn refresh_data(&mut self) {
         let cfg = self.config.read().unwrap();
         if cfg.get_version() <= self.version {
             return;
@@ -49,7 +45,6 @@ impl CDS {
 
         self.clusters = new_clusters;
         self.version += cfg.get_version();
-        self.init = true;
     }
 }
 
@@ -60,10 +55,15 @@ impl tokio::stream::Stream for CDS {
         mut self: std::pin::Pin<&mut Self>,
         _: &mut Context<'_>,
     ) -> Poll<Option<Result<DiscoveryResponse, tonic::Status>>> {
-        if !self.init {
-            return Poll::Pending;
+        {
+            let cfg = self.config.clone();
+            let version = cfg.read().unwrap().get_version();
+            if self.version == version {
+                return Poll::Pending;
+            }
         }
-        self.init = false;
+        self.refresh_data();
+
         let mut clusters: Vec<prost_types::Any> = Vec::new();
 
         for cds_cluster in &self.clusters {
@@ -105,6 +105,7 @@ impl ClusterDiscoveryService for CDS {
         &self,
         _request: Request<tonic::Streaming<DiscoveryRequest>>,
     ) -> Result<Response<Self::StreamClustersStream>, Status> {
+        log::info!("Stream cluster request");
         Ok(Response::new(
             Box::pin(self.clone()) as Self::StreamClustersStream
         ))

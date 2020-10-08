@@ -25,7 +25,7 @@ impl MasterProcess {
 
                 let mut self_config = cfg.write().unwrap();
                 self_config.import(config.get_services(), initial_config.clone());
-                println!("Config update to version: {}", self_config.get_version());
+                log::info!("Config update to version: {}", self_config.get_version());
             }
             std::thread::sleep(std::time::Duration::from_secs(5));
         });
