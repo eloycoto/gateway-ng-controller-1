@@ -16,6 +16,7 @@ use processor::MasterProcess;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
     let mut master_process = MasterProcess::default();
     master_process
         .start("0.0.0.0:5000".parse().unwrap())
