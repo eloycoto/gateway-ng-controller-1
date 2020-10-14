@@ -9,8 +9,11 @@ OPEN_APP ?= xdg-open
 	ingress-admin-url ingress-admin-open curl
 
 # Check http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
-fetch_protos: ## Fetch protobuf files
+fetch_protos: ##  Fetch protobuf files
 	$(Q) git submodule update --init --recursive
+
+update_protos: ##  Update Protobuf files
+	$(Q) git submodule update --remote --merge
 
 doc: ## open project documentation
 	$(Q) cargo doc --open
