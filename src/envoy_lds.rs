@@ -1,6 +1,8 @@
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 use std::task::{Context, Poll};
+use std::thread;
+use std::time;
 use tokio::stream::Stream;
 use tonic::{Request, Response, Status, Streaming};
 
@@ -44,7 +46,7 @@ impl LDS {
         }
 
         self.listeners = new_listeners;
-        self.version += cfg.get_version();
+        self.version = cfg.get_version();
     }
 }
 
@@ -53,16 +55,28 @@ impl tokio::stream::Stream for LDS {
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
-        _: &mut Context<'_>,
+        ctx: &mut Context<'_>,
     ) -> Poll<Option<Result<DiscoveryResponse, tonic::Status>>> {
+        let mut send_data = false;
         {
             let cfg = self.config.clone();
             let version = cfg.read().unwrap().get_version();
-            if self.version == version {
-                return Poll::Pending;
+            if self.version != version {
+                send_data = true;
             }
         }
+
+        if !(send_data) {
+            // @TODO config should return a future when a config is updated
+            log::trace!("Sleep LDS because no config changes made");
+            thread::sleep(time::Duration::from_secs(5));
+            ctx.waker().clone().wake();
+            return Poll::Pending;
+        }
+
+        log::info!("Refreshing LDS config due a version mistmatch");
         self.refresh_data();
+
         let mut listeners: Vec<prost_types::Any> = Vec::new();
 
         for listener in &self.listeners {
