@@ -69,8 +69,11 @@ impl tokio::stream::Stream for CDS {
         if !(send_data) {
             // @TODO config should return a future when a config is updated
             log::trace!("Sleep CDS because no changes made");
-            thread::sleep(time::Duration::from_secs(5));
-            ctx.waker().clone().wake();
+            let waker = ctx.waker().clone();
+            thread::spawn(move || {
+                thread::sleep(time::Duration::from_secs(5));
+                waker.wake();
+            });
             return Poll::Pending;
         }
         log::info!("Refreshing CDS config due a version mistmatch");

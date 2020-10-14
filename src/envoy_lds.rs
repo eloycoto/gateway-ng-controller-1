@@ -67,10 +67,12 @@ impl tokio::stream::Stream for LDS {
         }
 
         if !(send_data) {
-            // @TODO config should return a future when a config is updated
             log::trace!("Sleep LDS because no config changes made");
-            thread::sleep(time::Duration::from_secs(5));
-            ctx.waker().clone().wake();
+            let waker = ctx.waker().clone();
+            thread::spawn(move || {
+                thread::sleep(time::Duration::from_secs(5));
+                waker.wake();
+            });
             return Poll::Pending;
         }
 
