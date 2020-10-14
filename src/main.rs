@@ -1,6 +1,7 @@
 #![deny(clippy::all)]
 
-// use crate::envoy_cds::CDS;
+use env_logger::Env;
+
 mod configuration;
 mod envoy_cds;
 mod envoy_helpers;
@@ -16,7 +17,8 @@ use processor::MasterProcess;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
+    env_logger::from_env(Env::default().default_filter_or("info")).init();
+
     let mut master_process = MasterProcess::default();
     master_process
         .start("0.0.0.0:5000".parse().unwrap())
