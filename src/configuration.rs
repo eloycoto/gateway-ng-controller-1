@@ -45,7 +45,7 @@ impl Config {
         // @TODO handle error properly here
         let v: Vec<service::Service> = serde_json::from_str(raw_config.as_str()).unwrap();
         for val in v {
-            log::info!("Service with id='{}' added to the pool", val.id);
+            log::debug!("Service with id='{}' added to the config pool", val.id);
             result.push(val);
         }
         // Update services.
