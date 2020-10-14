@@ -7,8 +7,11 @@ OPEN_APP ?= xdg-open
 .PHONY: fetch-protos doc help up up-container up-local stop status top kill down proxy-info proxy
 
 # Check http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
-fetch_protos: ## Fetch protobuf files
+fetch_protos: ##  Fetch protobuf files
 	$(Q) git submodule update --init --recursive
+
+update_protos: ##  Update Protobuf files
+	$(Q) git submodule update --remote --merge
 
 doc: ## open project documentation
 	$(Q) cargo doc --open
