@@ -1,6 +1,8 @@
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 use std::task::{Context, Poll};
+use std::thread;
+use std::time;
 use tokio::stream::Stream;
 use tonic::{Request, Response, Status, Streaming};
 
@@ -44,7 +46,7 @@ impl CDS {
         }
 
         self.clusters = new_clusters;
-        self.version += cfg.get_version();
+        self.version = cfg.get_version();
     }
 }
 
@@ -53,15 +55,25 @@ impl tokio::stream::Stream for CDS {
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
-        _: &mut Context<'_>,
-    ) -> Poll<Option<Result<DiscoveryResponse, tonic::Status>>> {
+        ctx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let mut send_data = false;
         {
             let cfg = self.config.clone();
             let version = cfg.read().unwrap().get_version();
-            if self.version == version {
-                return Poll::Pending;
+            if self.version != version {
+                send_data = true;
             }
         }
+
+        if !(send_data) {
+            // @TODO config should return a future when a config is updated
+            log::trace!("Sleep CDS because no changes made");
+            thread::sleep(time::Duration::from_secs(5));
+            ctx.waker().clone().wake();
+            return Poll::Pending;
+        }
+        log::info!("Refreshing CDS config due a version mistmatch");
         self.refresh_data();
 
         let mut clusters: Vec<prost_types::Any> = Vec::new();
