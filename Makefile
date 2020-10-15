@@ -13,6 +13,9 @@ fetch_protos: ##  Fetch protobuf files
 update_protos: ##  Update Protobuf files
 	$(Q) git submodule update --remote --merge
 
+wasm_build: ## Build wasm filter
+	$(Q) cargo build --target=wasm32-unknown-unknown --lib --manifest-path wasm_filter/Cargo.toml
+
 doc: ## open project documentation
 	$(Q) cargo doc --open
 
