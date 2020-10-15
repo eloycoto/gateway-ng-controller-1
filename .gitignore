@@ -4,3 +4,7 @@
 /tarpaulin_report.html
 # Generated protobuffers
 /src/protobuf/
+
+# Wasm filter
+/wasm_filter/target
+
