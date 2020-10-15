@@ -1,0 +1,15 @@
+[package]
+name = "filter"
+version = "0.1.0"
+authors = ["Eloy Coto <eloy.coto@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+proxy-wasm = "0.1.0"
+log = "0.4.8"
+wasm-bindgen = "0.2.59"
+chrono = "0.4.11"
+wasm-bindgen-macro = "0.2.60"
+
+[lib]
+crate-type = ["cdylib"]
