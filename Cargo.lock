@@ -238,6 +238,7 @@ dependencies = [
 name = "gateway-ng-controller"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-stream 0.3.0",
  "env_logger",
  "futures 0.3.5",
