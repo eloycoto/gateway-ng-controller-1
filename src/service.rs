@@ -131,13 +131,69 @@ impl Service {
             value: buf,
         };
 
+        fn encode(arg: impl prost::Message) -> Vec<u8> {
+            let mut buf = Vec::new();
+            prost::Message::encode(&arg, &mut buf).unwrap();
+            return buf;
+        }
+
+        // WASM section, @TODO move out to a new method
+        //
+        use crate::protobuf::envoy::config::core::v3::async_data_source::Specifier;
+        use crate::protobuf::envoy::config::core::v3::http_uri::HttpUpstreamType;
+        use crate::protobuf::envoy::config::core::v3::AsyncDataSource;
+        use crate::protobuf::envoy::config::core::v3::HttpUri;
+        use crate::protobuf::envoy::config::core::v3::RemoteDataSource;
+        use crate::protobuf::envoy::extensions::filters::http::wasm::v3::Wasm;
+        use crate::protobuf::envoy::extensions::wasm::v3::plugin_config::Vm;
+        use crate::protobuf::envoy::extensions::wasm::v3::{PluginConfig, VmConfig};
+        let wasm_filter = Wasm {
+            config: Some(PluginConfig {
+                name: format!("Service::{:?}", self.id),
+                root_id: self.id.to_string(),
+                // configuration: Some(),
+                vm: Some(Vm::VmConfig(VmConfig {
+                    vm_id: "1".to_string(),
+                    runtime: "envoy.wasm.runtime.v8".to_string(),
+                    code: Some(AsyncDataSource {
+                        specifier: Some(Specifier::Remote(RemoteDataSource {
+                            http_uri: Some(HttpUri {
+                                uri: "http:/172.17.0.1:8000/filter.wasm".to_string(),
+                                timeout: Some(Duration {
+                                    seconds: 100,
+                                    nanos: 0,
+                                }),
+                                http_upstream_type: Some(HttpUpstreamType::Cluster(
+                                    "xds_cluster".to_string(),
+                                )),
+                            }),
+                            sha256: "XXX".to_string(),
+                            ..Default::default()
+                        })),
+                    }),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }),
+        };
+
         let connection_manager = HttpConnectionManager {
             stat_prefix: "ingress_http".to_string(),
             codec_type: 0,
-            http_filters: vec![HttpFilter {
-                name: "envoy.filters.http.router".to_string(),
-                config_type: Some(http_filter::ConfigType::TypedConfig(config)),
-            }],
+            http_filters: vec![
+                HttpFilter {
+                    name: "envoy.filters.http.wasm".to_string(),
+                    config_type: Some(http_filter::ConfigType::TypedConfig(prost_types::Any {
+                        type_url: "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
+                            .to_string(),
+                        value: encode(wasm_filter),
+                    })),
+                },
+                HttpFilter {
+                    name: "envoy.filters.http.router".to_string(),
+                    config_type: Some(http_filter::ConfigType::TypedConfig(config.clone())),
+                },
+            ],
             route_specifier: Some(RouteSpecifier::RouteConfig(RouteConfiguration {
                 name: format!("service_{:?}_route", self.id),
                 virtual_hosts: vec![VirtualHost {
@@ -173,55 +229,6 @@ impl Service {
             name: "envoy.filters.network.http_connection_manager".to_string(),
             config_type: Some(ConfigType::TypedConfig(config)),
         });
-
-        fn encode(arg: impl prost::Message) -> Vec<u8> {
-            let mut buf = Vec::new();
-            prost::Message::encode(&arg, &mut buf).unwrap();
-            return buf;
-        }
-
-        // WASM section, @TODO move out to a new method
-        //
-        use crate::protobuf::envoy::config::core::v3::async_data_source::Specifier;
-        use crate::protobuf::envoy::config::core::v3::AsyncDataSource;
-        use crate::protobuf::envoy::config::core::v3::HttpUri;
-        use crate::protobuf::envoy::config::core::v3::RemoteDataSource;
-        use crate::protobuf::envoy::extensions::filters::http::wasm::v3::Wasm;
-        use crate::protobuf::envoy::extensions::wasm::v3::plugin_config::Vm;
-        use crate::protobuf::envoy::extensions::wasm::v3::{PluginConfig, VmConfig};
-        let wasm_filter = Wasm {
-            config: Some(PluginConfig {
-                name: format!("Service::{:?}", self.id),
-                root_id: self.id.to_string(),
-                // configuration: Some(),
-                vm: Some(Vm::VmConfig(VmConfig {
-                    code: Some(AsyncDataSource {
-                        specifier: Some(Specifier::Remote(RemoteDataSource {
-                            http_uri: Some(HttpUri {
-                                uri: "http::/172.17.0.1:8000/code.wasm".to_string(),
-                                ..Default::default()
-                            }),
-                            ..Default::default()
-                        })),
-                    }),
-                    ..Default::default()
-                })),
-                ..Default::default()
-            }),
-        };
-
-        // let config = prost_types::Any {
-        //     type_url: "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.wasm".to_string(),
-        //     value: encode(wasm_filter),
-        // };
-
-        // filters.push(Filter {
-        //     name: "type.googleapis.com/envoy.filters.http.wasm".to_string(),
-        //     config_type: Some(ConfigType::TypedConfig(prost_types::Any {
-        //         type_url: "type.googleapis.com/envoy.filters.http.wasm".to_string(),
-        //         value: encode(wasm_filter),
-        //     })),
-        // });
         // dbg!(filters.clone());
         Ok(Listener {
             name: format!("service {}", self.id),
