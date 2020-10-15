@@ -13,6 +13,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "./protos/envoyproxy/data-plane-api/envoy/config/endpoint/v3/endpoint.proto",
             "./protos/envoyproxy/data-plane-api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto",
             "./protos/envoyproxy/data-plane-api/envoy/extensions/filters/http/router/v3/router.proto",
+            "./protos/envoyproxy/data-plane-api/envoy/extensions/filters/http/wasm/v3/wasm.proto",
+            "./protos/envoyproxy/data-plane-api/envoy/extensions/wasm/v3/wasm.proto",
         ],
         &[
             "./protos/envoyproxy/data-plane-api/",
