@@ -1,13 +1,17 @@
+use anyhow::{Context, Result};
 use prost_types::Duration;
 use serde::{Deserialize, Serialize};
+
+use crate::util;
 
 use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
 
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
 use crate::protobuf::envoy::config::cluster::v3::cluster::ClusterDiscoveryType;
 use crate::protobuf::envoy::config::core::v3::Address;
+use crate::protobuf::envoy::config::core::v3::address::Address as AddressType;
 use crate::protobuf::envoy::config::core::v3::SocketAddress;
-use crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue;
+use crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier;
 use crate::protobuf::envoy::config::endpoint::v3::ClusterLoadAssignment;
 use crate::protobuf::envoy::config::endpoint::v3::Endpoint;
 use crate::protobuf::envoy::config::endpoint::v3::LbEndpoint;
@@ -42,9 +46,11 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn export(&self) -> Vec<EnvoyExport> {
+    pub fn export(&self) -> Result<Vec<EnvoyExport>> {
         let mut result: Vec<EnvoyExport> = Vec::new();
-        let cluster = self.export_clusters();
+        let cluster = self
+            .export_clusters()
+            .with_context(|| format!("failed to export cluster for service {}", self.id))?;
 
         result.push(EnvoyExport {
             key: format!("service::id::{}::cluster", self.id),
@@ -52,29 +58,32 @@ impl Service {
         });
 
         // Listener entries
-        let listener = self.export_listener();
+        let listener = self
+            .export_listener()
+            .with_context(|| format!("failed to export listener for service {}", self.id))?;
         result.push(EnvoyExport {
             key: format!("service::id::{}::listener", self.id),
             config: EnvoyResource::Listener(listener),
         });
 
-        result
+        Ok(result)
     }
+
     fn cluster_name(&self) -> std::string::String {
         return format!("Cluster::service::{}", self.id);
     }
 
-    fn export_clusters(&self) -> Cluster {
-        let socketaddress =
-            crate::protobuf::envoy::config::core::v3::address::Address::SocketAddress(
-                SocketAddress {
-                    address: self.target_domain.to_string(),
-                    // resolver_name: self.target_domain.to_string(),
-                    port_specifier: Some(crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier::PortValue(80)),
-                    ..Default::default()
-                },
-            );
-        Cluster {
+    fn export_clusters(&self) -> Result<Cluster> {
+        let (host, port) = util::host_port::parse(self.target_domain.as_str())?;
+        let address = host.into();
+        let port_specifier = port.map(PortSpecifier::PortValue);
+        let socketaddress = AddressType::SocketAddress(SocketAddress {
+            address,
+            port_specifier,
+            ..Default::default()
+        });
+
+        Ok(Cluster {
             name: self.cluster_name(),
             connect_timeout: Some(Duration {
                 seconds: 1,
@@ -100,10 +109,10 @@ impl Service {
                 ..Default::default()
             }),
             ..Default::default()
-        }
+        })
     }
 
-    fn export_listener(&self) -> Listener {
+    fn export_listener(&self) -> Result<Listener> {
         let mut filters = Vec::new();
 
         // @TODO no way, move this to a function or something.
@@ -113,8 +122,7 @@ impl Service {
                 ..Default::default()
             },
             &mut buf,
-        )
-        .unwrap();
+        )?;
 
         let config = prost_types::Any {
             type_url: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
@@ -153,7 +161,7 @@ impl Service {
         };
 
         let mut buf = Vec::new();
-        prost::Message::encode(&connection_manager, &mut buf).unwrap();
+        prost::Message::encode(&connection_manager, &mut buf)?;
 
         let config = prost_types::Any {
             type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager".to_string(),
@@ -165,24 +173,20 @@ impl Service {
             config_type: Some(ConfigType::TypedConfig(config)),
         });
 
-        Listener {
+        Ok(Listener {
             name: format!("service {}", self.id),
             address: Some(Address {
-                address: Some(
-                    crate::protobuf::envoy::config::core::v3::address::Address::SocketAddress(
-                        SocketAddress {
-                            address: "0.0.0.0".to_string(),
-                            port_specifier: Some(PortValue(80)),
-                            ..Default::default()
-                        },
-                    ),
-                ),
+                address: Some(AddressType::SocketAddress(SocketAddress {
+                    address: "0.0.0.0".to_string(),
+                    port_specifier: Some(PortSpecifier::PortValue(80)),
+                    ..Default::default()
+                })),
             }),
             filter_chains: vec![FilterChain {
                 filters,
                 ..Default::default()
             }],
             ..Default::default()
-        }
+        })
     }
 }

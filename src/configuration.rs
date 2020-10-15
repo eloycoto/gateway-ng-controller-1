@@ -6,6 +6,8 @@ use std::io::Read;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 
+use anyhow::Result;
+
 type ServicesList = Vec<service::Service>;
 
 #[derive(Default, Debug, Clone)]
@@ -65,10 +67,26 @@ impl Config {
     }
 
     pub fn export_config_to_envoy(&self) -> EnvoyExportList {
-        let mut result = Vec::with_capacity(self.services.len());
-        result.extend(self.services.iter().flat_map(service::Service::export));
+        let (exportlist, errorlist): (Vec<_>, Vec<_>) = self
+            .services
+            .iter()
+            .map(service::Service::export)
+            .partition(|it| it.is_ok());
+
+        if !errorlist.is_empty() {
+            log::error!("Some data could not be exported");
+            errorlist
+                .into_iter()
+                .map(Result::unwrap_err)
+                .for_each(|err| log::error!("-> {}", err));
+        }
+
+        let mut result = Vec::with_capacity(exportlist.len());
+        result.extend(exportlist.into_iter().flat_map(Result::unwrap));
+
         result
     }
+
     pub fn get_version(&self) -> u32 {
         self.version
     }
