@@ -17,6 +17,7 @@ update_protos: ##  Update Protobuf files
 
 wasm_build: ## Build wasm filter
 	$(Q) cargo build --target=wasm32-unknown-unknown --lib --manifest-path wasm_filter/Cargo.toml
+	$(Q) cp -fv wasm_filter/target/wasm32-unknown-unknown/debug/filter.wasm static/
 
 doc: ## open project documentation
 	$(Q) cargo doc --open
