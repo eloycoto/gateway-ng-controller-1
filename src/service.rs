@@ -49,7 +49,7 @@ use crate::protobuf::envoy::extensions::filters::network::http_connection_manage
 //
 //
 
-const WASM_FILTER_PATH: &'static str = "static/filter.wasm";
+const WASM_FILTER_PATH: &str = "static/filter.wasm";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Service {
@@ -133,7 +133,7 @@ impl Service {
         fn encode(arg: impl prost::Message) -> Vec<u8> {
             let mut buf = Vec::new();
             prost::Message::encode(&arg, &mut buf).unwrap();
-            return buf;
+            buf
         }
 
         let config = prost_types::Any {
@@ -188,7 +188,7 @@ impl Service {
                 },
                 HttpFilter {
                     name: "envoy.filters.http.router".to_string(),
-                    config_type: Some(http_filter::ConfigType::TypedConfig(config.clone())),
+                    config_type: Some(http_filter::ConfigType::TypedConfig(config)),
                 },
             ],
             route_specifier: Some(RouteSpecifier::RouteConfig(RouteConfiguration {
@@ -244,6 +244,6 @@ impl Service {
         let input = File::open(WASM_FILTER_PATH.to_string())?;
         let reader = BufReader::new(input);
         let result = util::file_utils::sha256_digest(reader)?;
-        return Ok(format!("{}", HEXUPPER.encode(result.as_ref())).to_lowercase());
+        Ok(HEXUPPER.encode(result.as_ref()).to_lowercase())
     }
 }
