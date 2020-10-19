@@ -29,6 +29,24 @@ static_resources:
                     socket_address:
                       address: control-plane-main
                       port_value: 5000
+    - name: wasm_files
+      connect_timeout: 0.25s
+      type: strict_dns
+      lb_policy: round_robin
+      http2_protocol_options: {}
+      upstream_connection_options:
+        # configure a TCP keep-alive to detect and reconnect to the admin
+        # server in the event of a TCP socket half open connection
+        tcp_keepalive: {}
+      load_assignment:
+        cluster_name: xds_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: control-plane-main
+                  port_value: 5001
 
 admin:
   access_log_path: /dev/stdout
