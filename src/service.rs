@@ -76,7 +76,7 @@ impl Service {
     fn export_clusters(&self) -> Result<Cluster> {
         let (host, port) = util::host_port::parse(self.target_domain.as_str())?;
         let address = host.into();
-        let port_specifier = port.map(PortSpecifier::PortValue);
+        let port_specifier = port.or(Some(80)).map(PortSpecifier::PortValue);
         let socketaddress = AddressType::SocketAddress(SocketAddress {
             address,
             port_specifier,
