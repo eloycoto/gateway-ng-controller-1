@@ -158,7 +158,7 @@ impl Service {
                     code: Some(AsyncDataSource {
                         specifier: Some(Specifier::Remote(RemoteDataSource {
                             http_uri: Some(HttpUri {
-                                uri: "http://172.17.0.1:8000/filter.wasm".to_string(),
+                                uri: "http://172.17.0.1:5001/static/filter.wasm".to_string(),
                                 timeout: Some(Duration {
                                     seconds: 100,
                                     nanos: 0,
