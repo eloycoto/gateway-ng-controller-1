@@ -130,41 +130,32 @@ impl Service {
     fn export_listener(&self) -> Result<Listener> {
         let mut filters = Vec::new();
 
-        // @TODO no way, move this to a function or something.
-        let mut buf = Vec::new();
-        prost::Message::encode(
-            &Router {
-                ..Default::default()
-            },
-            &mut buf,
-        )?;
-
-        let config = prost_types::Any {
-            type_url: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
-                .to_string(),
-            value: buf,
-        };
-
         fn encode(arg: impl prost::Message) -> Vec<u8> {
             let mut buf = Vec::new();
             prost::Message::encode(&arg, &mut buf).unwrap();
             return buf;
         }
 
+        let config = prost_types::Any {
+            type_url: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+                .to_string(),
+            value: encode(Router {
+                ..Default::default()
+            }),
+        };
+
         // WASM section, @TODO move out to a new method
-        //
         let wasm_filter = Wasm {
             config: Some(PluginConfig {
                 name: format!("Service::{:?}", self.id),
                 root_id: format!("Service::{:?}", self.id),
-                // configuration: Some(),
                 vm: Some(Vm::VmConfig(VmConfig {
                     vm_id: format!("Service::{:?}", self.id),
                     runtime: "envoy.wasm.runtime.v8".to_string(),
                     code: Some(AsyncDataSource {
                         specifier: Some(Specifier::Remote(RemoteDataSource {
                             http_uri: Some(HttpUri {
-                                uri: format!("http://172.17.0.1:5001/{}", WASM_FILTER_PATH),
+                                uri: format!("http://control-plane:5001/{}", WASM_FILTER_PATH),
                                 timeout: Some(Duration {
                                     seconds: 100,
                                     nanos: 0,
@@ -223,19 +214,15 @@ impl Service {
             ..Default::default()
         };
 
-        let mut buf = Vec::new();
-        prost::Message::encode(&connection_manager, &mut buf)?;
-
-        let config = prost_types::Any {
-            type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager".to_string(),
-            value: buf,
-        };
-
         filters.push(Filter {
             name: "envoy.filters.network.http_connection_manager".to_string(),
-            config_type: Some(ConfigType::TypedConfig(config)),
+            config_type: Some(ConfigType::TypedConfig(
+              prost_types::Any {
+                type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager".to_string(),
+                value: encode(connection_manager),
+              }))
         });
-        // dbg!(filters.clone());
+
         Ok(Listener {
             name: format!("service {}", self.id),
             address: Some(Address {
@@ -257,6 +244,6 @@ impl Service {
         let input = File::open(WASM_FILTER_PATH.to_string())?;
         let reader = BufReader::new(input);
         let result = util::file_utils::sha256_digest(reader)?;
-        return Ok(format!("{}", HEXUPPER.encode(result.as_ref())));
+        return Ok(format!("{}", HEXUPPER.encode(result.as_ref())).to_lowercase());
     }
 }
