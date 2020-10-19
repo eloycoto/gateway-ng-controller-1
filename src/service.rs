@@ -1,16 +1,26 @@
 use anyhow::{Context, Result};
+use data_encoding::HEXUPPER;
 use prost_types::Duration;
 use serde::{Deserialize, Serialize};
-
-use crate::util;
+use std::fs::File;
+use std::io::BufReader;
 
 use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
+use crate::util;
 
+use crate::protobuf::envoy::config::core::v3::AsyncDataSource;
+use crate::protobuf::envoy::config::core::v3::HttpUri;
+use crate::protobuf::envoy::config::core::v3::RemoteDataSource;
+use crate::protobuf::envoy::config::core::v3::async_data_source::Specifier;
+use crate::protobuf::envoy::config::core::v3::http_uri::HttpUpstreamType;
+use crate::protobuf::envoy::extensions::filters::http::wasm::v3::Wasm;
+use crate::protobuf::envoy::extensions::wasm::v3::plugin_config::Vm;
+use crate::protobuf::envoy::extensions::wasm::v3::{PluginConfig, VmConfig};
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
 use crate::protobuf::envoy::config::cluster::v3::cluster::ClusterDiscoveryType;
 use crate::protobuf::envoy::config::core::v3::Address;
-use crate::protobuf::envoy::config::core::v3::address::Address as AddressType;
 use crate::protobuf::envoy::config::core::v3::SocketAddress;
+use crate::protobuf::envoy::config::core::v3::address::Address as AddressType;
 use crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier;
 use crate::protobuf::envoy::config::endpoint::v3::ClusterLoadAssignment;
 use crate::protobuf::envoy::config::endpoint::v3::Endpoint;
@@ -29,14 +39,18 @@ use crate::protobuf::envoy::config::route::v3::VirtualHost;
 use crate::protobuf::envoy::config::route::v3::route::Action;
 use crate::protobuf::envoy::config::route::v3::route_action::ClusterSpecifier;
 use crate::protobuf::envoy::config::route::v3::route_match::PathSpecifier;
+use crate::protobuf::envoy::extensions::filters::http::router::v3::Router;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
-use crate::protobuf::envoy::extensions::filters::http::router::v3::Router;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_connection_manager::RouteSpecifier;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_filter;
-
 // @TODO target domain connect_timeout
 // @TODO optional fields
+//
+//
+
+const WASM_FILTER_PATH: &'static str = "static/filter.wasm";
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Service {
     pub id: u32,
@@ -139,14 +153,6 @@ impl Service {
 
         // WASM section, @TODO move out to a new method
         //
-        use crate::protobuf::envoy::config::core::v3::async_data_source::Specifier;
-        use crate::protobuf::envoy::config::core::v3::http_uri::HttpUpstreamType;
-        use crate::protobuf::envoy::config::core::v3::AsyncDataSource;
-        use crate::protobuf::envoy::config::core::v3::HttpUri;
-        use crate::protobuf::envoy::config::core::v3::RemoteDataSource;
-        use crate::protobuf::envoy::extensions::filters::http::wasm::v3::Wasm;
-        use crate::protobuf::envoy::extensions::wasm::v3::plugin_config::Vm;
-        use crate::protobuf::envoy::extensions::wasm::v3::{PluginConfig, VmConfig};
         let wasm_filter = Wasm {
             config: Some(PluginConfig {
                 name: format!("Service::{:?}", self.id),
@@ -158,18 +164,16 @@ impl Service {
                     code: Some(AsyncDataSource {
                         specifier: Some(Specifier::Remote(RemoteDataSource {
                             http_uri: Some(HttpUri {
-                                uri: "http://172.17.0.1:5001/static/filter.wasm".to_string(),
+                                uri: format!("http://172.17.0.1:5001/{}", WASM_FILTER_PATH),
                                 timeout: Some(Duration {
                                     seconds: 100,
                                     nanos: 0,
                                 }),
                                 http_upstream_type: Some(HttpUpstreamType::Cluster(
-                                    "wasm_test".to_string(),
+                                    "wasm_files".to_string(),
                                 )),
                             }),
-                            sha256:
-                                "8be76a8b583426049dbc6bd0ce2e93847b9282a71c660946fc73f635a31f3ebb"
-                                    .to_string(),
+                            sha256: self.get_wasm_filter_sha().unwrap(),
                             ..Default::default()
                         })),
                     }),
@@ -247,5 +251,12 @@ impl Service {
             }],
             ..Default::default()
         })
+    }
+
+    fn get_wasm_filter_sha(&self) -> Result<std::string::String> {
+        let input = File::open(WASM_FILTER_PATH.to_string())?;
+        let reader = BufReader::new(input);
+        let result = util::file_utils::sha256_digest(reader)?;
+        return Ok(format!("{}", HEXUPPER.encode(result.as_ref())));
     }
 }
