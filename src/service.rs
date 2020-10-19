@@ -153,7 +153,7 @@ impl Service {
                 root_id: format!("Service::{:?}", self.id),
                 // configuration: Some(),
                 vm: Some(Vm::VmConfig(VmConfig {
-                    vm_id: "service_1".to_string(),
+                    vm_id: format!("Service::{:?}", self.id),
                     runtime: "envoy.wasm.runtime.v8".to_string(),
                     code: Some(AsyncDataSource {
                         specifier: Some(Specifier::Remote(RemoteDataSource {
