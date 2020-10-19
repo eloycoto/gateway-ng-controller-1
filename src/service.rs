@@ -150,24 +150,26 @@ impl Service {
         let wasm_filter = Wasm {
             config: Some(PluginConfig {
                 name: format!("Service::{:?}", self.id),
-                root_id: self.id.to_string(),
+                root_id: format!("Service::{:?}", self.id),
                 // configuration: Some(),
                 vm: Some(Vm::VmConfig(VmConfig {
-                    vm_id: "1".to_string(),
+                    vm_id: "service_1".to_string(),
                     runtime: "envoy.wasm.runtime.v8".to_string(),
                     code: Some(AsyncDataSource {
                         specifier: Some(Specifier::Remote(RemoteDataSource {
                             http_uri: Some(HttpUri {
-                                uri: "http:/172.17.0.1:8000/filter.wasm".to_string(),
+                                uri: "http://172.17.0.1:8000/filter.wasm".to_string(),
                                 timeout: Some(Duration {
                                     seconds: 100,
                                     nanos: 0,
                                 }),
                                 http_upstream_type: Some(HttpUpstreamType::Cluster(
-                                    "xds_cluster".to_string(),
+                                    "wasm_test".to_string(),
                                 )),
                             }),
-                            sha256: "XXX".to_string(),
+                            sha256:
+                                "8be76a8b583426049dbc6bd0ce2e93847b9282a71c660946fc73f635a31f3ebb"
+                                    .to_string(),
                             ..Default::default()
                         })),
                     }),
