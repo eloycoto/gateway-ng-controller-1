@@ -12,6 +12,7 @@ mod processor;
 #[rustfmt::skip]
 mod protobuf;
 mod service;
+mod util;
 
 use processor::MasterProcess;
 
