@@ -152,6 +152,10 @@ impl Service {
                 vm: Some(Vm::VmConfig(VmConfig {
                     vm_id: format!("Service::{:?}", self.id),
                     runtime: "envoy.wasm.runtime.v8".to_string(),
+                    configuration: Some(prost_types::Any {
+                        type_url: "type.googleapis.com/google.protobuf.StringValue".to_string(),
+                        value: encode(serde_json::to_string(&self.clone()).unwrap()),
+                    }),
                     code: Some(AsyncDataSource {
                         specifier: Some(Specifier::Remote(RemoteDataSource {
                             http_uri: Some(HttpUri {
