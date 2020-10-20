@@ -6,9 +6,13 @@ services:
     volumes:
       - ${ENVOY_CONFIG:-./envoy/envoy.yaml}:/etc/envoy.yaml:z,ro
     expose:
+      - "80"
+      - "443"
       - "8080"
       - "8001"
     ports:
+      - "80"
+      - "443"
       - "8080"
       - "8001"
     scale: 1
