@@ -57,7 +57,7 @@ impl Config {
     fn read_path(&self, path: &str) -> std::string::String {
         let mut file = match File::open(path) {
             Ok(file) => file,
-            Err(error) => panic!("There was a problem opening the file: {:?}", error),
+            Err(error) => panic!("There was a problem opening the file {}: {:?}", path, error),
         };
         let mut contents = String::new();
         file.read_to_string(&mut contents)
