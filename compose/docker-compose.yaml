@@ -39,6 +39,7 @@ services:
       mesh:
         aliases:
           - app
+          - web.app
 
   control-plane:
     build:
