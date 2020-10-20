@@ -45,9 +45,11 @@ services:
       - ./control-plane/config.json:/home/app/bin/log.json:z,ro
     expose:
       - "5000"
+      - "5001"
     ports:
-      # export locally as 5001 to allow running a debug service at 5000
-      - "5001:5000"
+      # export locally as 501X to allow running a debug services at 500X
+      - "5010:5000"
+      - "5011:5001"
     networks:
       control-plane:
         aliases:
