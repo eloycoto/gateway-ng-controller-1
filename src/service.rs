@@ -52,11 +52,20 @@ use crate::protobuf::envoy::extensions::filters::network::http_connection_manage
 const WASM_FILTER_PATH: &str = "static/filter.wasm";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MappingRules {
+    pattern: std::string::String,
+    http_method: std::string::String, // @TODO this should be a enum, maybe from hyper
+    metric_system_name: std::string::String,
+    delta: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Service {
     pub id: u32,
     pub hosts: Vec<std::string::String>,
     pub policies: Vec<std::string::String>,
     pub target_domain: std::string::String,
+    pub proxy_rules: Vec<MappingRules>,
 }
 
 impl Service {

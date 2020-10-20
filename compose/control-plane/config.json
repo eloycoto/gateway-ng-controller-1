@@ -3,6 +3,14 @@
     "id": 1,
     "hosts": ["web"],
     "policies": [],
-    "target_domain": "web.app:80"
+    "target_domain": "web.app:80",
+    "proxy_rules": [
+      {
+        "pattern": "/",
+        "http_method": "GET",
+        "metric_system_name": "hits",
+        "delta": 1
+      }
+    ]
   }
 ]

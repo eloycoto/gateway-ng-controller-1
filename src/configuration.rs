@@ -15,15 +15,6 @@ pub struct Config {
     services: ServicesList,
     hash: std::string::String,
     version: u32,
-    proxy_rules: Vec<MappingRules>,
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct MappingRules {
-    pattern: std::string::String,
-    http_method: std::string::String, // @TODO this should be a enum, maybe from hyper
-    metric_system_name: std::string::String,
-    delta: u32,
 }
 
 impl Config {
