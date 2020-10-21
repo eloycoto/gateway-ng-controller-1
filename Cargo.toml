@@ -19,19 +19,22 @@ maintenance = { status = "actively-developed" }
 
 [dependencies]
 
-async-stream = "^0"
+#async-stream = "^0"
 futures = { version = "^0", default-features = false, features = ["alloc"] }
 log = "^0"
 env_logger="^0"
+tokio = { version = "^0.2", features = ["macros"] }
 prost = { version = "^0", default-features = false, features = ["prost-derive"] }
 prost-types = { version = "^0", default-features = false }
-tokio = { version = "^0", features = ["macros"] }
-tokio-timer = "^0"
+#tokio-timer = "^0"
 tonic = "^0"
 serde_json = "^1"
 serde = { version = "^1", features = ["derive"] }
-lazy_static = "^1"
 anyhow = "^1"
+
+warp = "0.2.5"
+ring = "0.16.15"
+data-encoding = "2.3.0"
 
 [build-dependencies]
 tonic-build = "^0"

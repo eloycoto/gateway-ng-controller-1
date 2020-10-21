@@ -1,16 +1,26 @@
 use anyhow::{Context, Result};
+use data_encoding::HEXUPPER;
 use prost_types::Duration;
 use serde::{Deserialize, Serialize};
-
-use crate::util;
+use std::fs::File;
+use std::io::BufReader;
 
 use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
+use crate::util;
 
+use crate::protobuf::envoy::config::core::v3::AsyncDataSource;
+use crate::protobuf::envoy::config::core::v3::HttpUri;
+use crate::protobuf::envoy::config::core::v3::RemoteDataSource;
+use crate::protobuf::envoy::config::core::v3::async_data_source::Specifier;
+use crate::protobuf::envoy::config::core::v3::http_uri::HttpUpstreamType;
+use crate::protobuf::envoy::extensions::filters::http::wasm::v3::Wasm;
+use crate::protobuf::envoy::extensions::wasm::v3::plugin_config::Vm;
+use crate::protobuf::envoy::extensions::wasm::v3::{PluginConfig, VmConfig};
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
 use crate::protobuf::envoy::config::cluster::v3::cluster::ClusterDiscoveryType;
 use crate::protobuf::envoy::config::core::v3::Address;
-use crate::protobuf::envoy::config::core::v3::address::Address as AddressType;
 use crate::protobuf::envoy::config::core::v3::SocketAddress;
+use crate::protobuf::envoy::config::core::v3::address::Address as AddressType;
 use crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier;
 use crate::protobuf::envoy::config::endpoint::v3::ClusterLoadAssignment;
 use crate::protobuf::envoy::config::endpoint::v3::Endpoint;
@@ -29,20 +39,33 @@ use crate::protobuf::envoy::config::route::v3::VirtualHost;
 use crate::protobuf::envoy::config::route::v3::route::Action;
 use crate::protobuf::envoy::config::route::v3::route_action::ClusterSpecifier;
 use crate::protobuf::envoy::config::route::v3::route_match::PathSpecifier;
+use crate::protobuf::envoy::extensions::filters::http::router::v3::Router;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
-use crate::protobuf::envoy::extensions::filters::http::router::v3::Router;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_connection_manager::RouteSpecifier;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_filter;
-
 // @TODO target domain connect_timeout
 // @TODO optional fields
+//
+//
+
+const WASM_FILTER_PATH: &str = "static/filter.wasm";
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MappingRules {
+    pattern: std::string::String,
+    http_method: std::string::String, // @TODO this should be a enum, maybe from hyper
+    metric_system_name: std::string::String,
+    delta: u32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Service {
     pub id: u32,
     pub hosts: Vec<std::string::String>,
     pub policies: Vec<std::string::String>,
     pub target_domain: std::string::String,
+    pub proxy_rules: Vec<MappingRules>,
 }
 
 impl Service {
@@ -116,28 +139,71 @@ impl Service {
     fn export_listener(&self) -> Result<Listener> {
         let mut filters = Vec::new();
 
-        // @TODO no way, move this to a function or something.
-        let mut buf = Vec::new();
-        prost::Message::encode(
-            &Router {
-                ..Default::default()
-            },
-            &mut buf,
-        )?;
+        fn encode(arg: impl prost::Message) -> Result<Vec<u8>> {
+            let mut buf = Vec::new();
+            prost::Message::encode(&arg, &mut buf)?;
+            Ok(buf)
+        }
 
         let config = prost_types::Any {
             type_url: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
                 .to_string(),
-            value: buf,
+            value: encode(Router {
+                ..Default::default()
+            })?,
+        };
+
+        // WASM section, @TODO move out to a new method
+        let wasm_filter = Wasm {
+            config: Some(PluginConfig {
+                name: format!("Service::{:?}", self.id),
+                root_id: format!("Service::{:?}", self.id),
+                vm: Some(Vm::VmConfig(VmConfig {
+                    vm_id: format!("Service::{:?}", self.id),
+                    runtime: "envoy.wasm.runtime.v8".to_string(),
+                    configuration: Some(prost_types::Any {
+                        type_url: "type.googleapis.com/google.protobuf.StringValue".to_string(),
+                        value: encode(serde_json::to_string(&self.clone()).unwrap())?,
+                    }),
+                    code: Some(AsyncDataSource {
+                        specifier: Some(Specifier::Remote(RemoteDataSource {
+                            http_uri: Some(HttpUri {
+                                uri: format!("http://control-plane-main:5001/{}", WASM_FILTER_PATH),
+                                timeout: Some(Duration {
+                                    seconds: 100,
+                                    nanos: 0,
+                                }),
+                                http_upstream_type: Some(HttpUpstreamType::Cluster(
+                                    "wasm_files".to_string(),
+                                )),
+                            }),
+                            sha256: self.get_wasm_filter_sha().unwrap(),
+                            ..Default::default()
+                        })),
+                    }),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }),
         };
 
         let connection_manager = HttpConnectionManager {
             stat_prefix: "ingress_http".to_string(),
             codec_type: 0,
-            http_filters: vec![HttpFilter {
-                name: "envoy.filters.http.router".to_string(),
-                config_type: Some(http_filter::ConfigType::TypedConfig(config)),
-            }],
+            http_filters: vec![
+                HttpFilter {
+                    name: "envoy.filters.http.wasm".to_string(),
+                    config_type: Some(http_filter::ConfigType::TypedConfig(prost_types::Any {
+                        type_url: "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
+                            .to_string(),
+                        value: encode(wasm_filter)?,
+                    })),
+                },
+                HttpFilter {
+                    name: "envoy.filters.http.router".to_string(),
+                    config_type: Some(http_filter::ConfigType::TypedConfig(config)),
+                },
+            ],
             route_specifier: Some(RouteSpecifier::RouteConfig(RouteConfiguration {
                 name: format!("service_{:?}_route", self.id),
                 virtual_hosts: vec![VirtualHost {
@@ -161,17 +227,13 @@ impl Service {
             ..Default::default()
         };
 
-        let mut buf = Vec::new();
-        prost::Message::encode(&connection_manager, &mut buf)?;
-
-        let config = prost_types::Any {
-            type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager".to_string(),
-            value: buf,
-        };
-
         filters.push(Filter {
             name: "envoy.filters.network.http_connection_manager".to_string(),
-            config_type: Some(ConfigType::TypedConfig(config)),
+            config_type: Some(ConfigType::TypedConfig(
+              prost_types::Any {
+                type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager".to_string(),
+                value: encode(connection_manager)?,
+              }))
         });
 
         Ok(Listener {
@@ -189,5 +251,12 @@ impl Service {
             }],
             ..Default::default()
         })
+    }
+
+    fn get_wasm_filter_sha(&self) -> Result<std::string::String> {
+        let input = File::open(WASM_FILTER_PATH.to_string())?;
+        let reader = BufReader::new(input);
+        let result = util::file_utils::sha256_digest(reader)?;
+        Ok(HEXUPPER.encode(result.as_ref()).to_lowercase())
     }
 }

@@ -74,6 +74,13 @@ pub mod envoy {
 
     #[path = "."]
     pub mod extensions {
+
+        #[path = "."]
+        pub mod wasm {
+            #[path = "envoy.extensions.wasm.v3.rs"]
+            pub mod v3;
+        }
+
         #[path = "."]
         pub mod filters {
             #[path = "."]
@@ -90,6 +97,12 @@ pub mod envoy {
                 #[path = "."]
                 pub mod router {
                     #[path = "envoy.extensions.filters.http.router.v3.rs"]
+                    pub mod v3;
+                }
+
+                #[path = "."]
+                pub mod wasm {
+                    #[path = "envoy.extensions.filters.http.wasm.v3.rs"]
                     pub mod v3;
                 }
             }
