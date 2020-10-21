@@ -19,6 +19,16 @@ dynamic_resources:
 
 static_resources:
   clusters:
+
+    - name: httpbin
+      connect_timeout: 1s
+      type: logical_dns
+      lb_policy: round_robin
+      hosts:
+      - socket_address:
+          address: httpbin.org
+          port_value: 80
+
     - name: xds_cluster
       connect_timeout: 2.0s
       type: logical_dns
