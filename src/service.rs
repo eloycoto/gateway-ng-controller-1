@@ -139,10 +139,10 @@ impl Service {
     fn export_listener(&self) -> Result<Listener> {
         let mut filters = Vec::new();
 
-        fn encode(arg: impl prost::Message) -> Vec<u8> {
+        fn encode(arg: impl prost::Message) -> Result<Vec<u8>> {
             let mut buf = Vec::new();
-            prost::Message::encode(&arg, &mut buf).unwrap();
-            buf
+            prost::Message::encode(&arg, &mut buf)?;
+            Ok(buf)
         }
 
         let config = prost_types::Any {
@@ -150,7 +150,7 @@ impl Service {
                 .to_string(),
             value: encode(Router {
                 ..Default::default()
-            }),
+            })?,
         };
 
         // WASM section, @TODO move out to a new method
@@ -163,12 +163,12 @@ impl Service {
                     runtime: "envoy.wasm.runtime.v8".to_string(),
                     configuration: Some(prost_types::Any {
                         type_url: "type.googleapis.com/google.protobuf.StringValue".to_string(),
-                        value: encode(serde_json::to_string(&self.clone()).unwrap()),
+                        value: encode(serde_json::to_string(&self.clone()).unwrap())?,
                     }),
                     code: Some(AsyncDataSource {
                         specifier: Some(Specifier::Remote(RemoteDataSource {
                             http_uri: Some(HttpUri {
-                                uri: format!("http://control-plane:5001/{}", WASM_FILTER_PATH),
+                                uri: format!("http://control-plane-main:5001/{}", WASM_FILTER_PATH),
                                 timeout: Some(Duration {
                                     seconds: 100,
                                     nanos: 0,
@@ -196,7 +196,7 @@ impl Service {
                     config_type: Some(http_filter::ConfigType::TypedConfig(prost_types::Any {
                         type_url: "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
                             .to_string(),
-                        value: encode(wasm_filter),
+                        value: encode(wasm_filter)?,
                     })),
                 },
                 HttpFilter {
@@ -232,7 +232,7 @@ impl Service {
             config_type: Some(ConfigType::TypedConfig(
               prost_types::Any {
                 type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager".to_string(),
-                value: encode(connection_manager),
+                value: encode(connection_manager)?,
               }))
         });
 

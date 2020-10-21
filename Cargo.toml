@@ -23,7 +23,7 @@ maintenance = { status = "actively-developed" }
 futures = { version = "^0", default-features = false, features = ["alloc"] }
 log = "^0"
 env_logger="^0"
-tokio = { version = "0.2.22", features = ["macros"] }
+tokio = { version = "^0.2", features = ["macros"] }
 prost = { version = "^0", default-features = false, features = ["prost-derive"] }
 prost-types = { version = "^0", default-features = false }
 #tokio-timer = "^0"

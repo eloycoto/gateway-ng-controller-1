@@ -8,13 +8,16 @@ OPEN_APP ?= xdg-open
 	down proxy-info proxy ingress-helper ingress-url ingress-open \
 	ingress-admin-url ingress-admin-open curl
 
-# Check http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
+
+.PHONY: fetch_protos
 fetch_protos: ##  Fetch protobuf files
 	$(Q) git submodule update --init --recursive
 
+.PHONY: update_protos
 update_protos: ##  Update Protobuf files
 	$(Q) git submodule update --remote --merge
 
+.PHONY: wasm_build
 wasm_build: ## Build wasm filter
 	$(Q) cargo build --target=wasm32-unknown-unknown --lib --manifest-path wasm_filter/Cargo.toml
 	$(Q) cp -fv wasm_filter/target/wasm32-unknown-unknown/debug/filter.wasm static/
@@ -105,5 +108,6 @@ curl: export HOST?=web.app
 curl: ## Perform a request to a specific service (default ingress:80 with Host: web.app)
 	curl -vvv -H "Host: $(HOST)" "$(SCHEME)://$$($(DOCKER_COMPOSE) port --index $(INDEX) $(SERVICE) $(PORT))/"
 
+# Check http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 help: ## Print this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)

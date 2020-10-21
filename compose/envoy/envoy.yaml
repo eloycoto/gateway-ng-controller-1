@@ -48,7 +48,7 @@ static_resources:
         # server in the event of a TCP socket half open connection
         tcp_keepalive: {}
       load_assignment:
-        cluster_name: xds_cluster
+        cluster_name: wasm_files
         endpoints:
         - lb_endpoints:
           - endpoint:
