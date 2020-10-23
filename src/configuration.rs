@@ -78,7 +78,11 @@ impl Config {
             errorlist
                 .into_iter()
                 .map(Result::unwrap_err)
-                .for_each(|err| log::error!("-> {}", err));
+                .for_each(|err| {
+                    // Print extended error information with causes
+                    // Will also print backtrace if enabled via envvar on nightly
+                    log::error!("-> {:?}", err);
+                });
         }
 
         let mut result = Vec::with_capacity(exportlist.len());

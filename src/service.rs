@@ -4,6 +4,7 @@ use prost_types::Duration;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
 
 use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
 use crate::util;
@@ -163,7 +164,7 @@ impl Service {
                     runtime: "envoy.wasm.runtime.v8".to_string(),
                     configuration: Some(prost_types::Any {
                         type_url: "type.googleapis.com/google.protobuf.StringValue".to_string(),
-                        value: encode(serde_json::to_string(&self.clone()).unwrap())?,
+                        value: encode(serde_json::to_string(&self.clone())?)?,
                     }),
                     code: Some(AsyncDataSource {
                         specifier: Some(Specifier::Remote(RemoteDataSource {
@@ -177,7 +178,9 @@ impl Service {
                                     "wasm_files".to_string(),
                                 )),
                             }),
-                            sha256: self.get_wasm_filter_sha().unwrap(),
+                            sha256: self
+                                .get_wasm_filter_sha(WASM_FILTER_PATH)
+                                .context("could not compute SHA-256")?,
                             ..Default::default()
                         })),
                     }),
@@ -253,8 +256,10 @@ impl Service {
         })
     }
 
-    fn get_wasm_filter_sha(&self) -> Result<std::string::String> {
-        let input = File::open(WASM_FILTER_PATH.to_string())?;
+    fn get_wasm_filter_sha(&self, path: impl AsRef<Path>) -> Result<std::string::String> {
+        let path = path.as_ref();
+        let input = File::open(path)
+            .with_context(|| format!("failed to open wasm filter: {}", path.display()))?;
         let reader = BufReader::new(input);
         let result = util::file_utils::sha256_digest(reader)?;
         Ok(HEXUPPER.encode(result.as_ref()).to_lowercase())
