@@ -14,7 +14,7 @@ env:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.required }}
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
@@ -22,10 +22,11 @@ jobs:
           - stable
           - beta
           #- 1.45.2 # MSRV has not been defined for this project
-        required: [true]
+        experimental: [false]
         include:
+          # Stop breakages in nightly to fail the workflow
           - rust: nightly
-            required: false
+            experimental: true
 
     steps:
       - uses: actions/checkout@v2
