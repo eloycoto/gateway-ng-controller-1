@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
+use crate::envoy_helpers::{get_envoy_cluster, EnvoyExport, EnvoyResource};
 use crate::oidc::OIDCConfig;
 use crate::util;
 
@@ -107,43 +107,10 @@ impl Service {
     }
 
     fn export_clusters(&self) -> Result<Cluster> {
-        let (host, port) = util::host_port::parse(self.target_domain.as_str())?;
-        let address = host.into();
-        let port_specifier = port.or(Some(80)).map(PortSpecifier::PortValue);
-        let socketaddress = AddressType::SocketAddress(SocketAddress {
-            address,
-            port_specifier,
-            ..Default::default()
-        });
-
-        Ok(Cluster {
-            name: self.cluster_name(),
-            connect_timeout: Some(Duration {
-                seconds: 1,
-                nanos: 0,
-            }),
-            cluster_discovery_type: Some(ClusterDiscoveryType::Type(2)),
-            dns_refresh_rate: Some(core::time::Duration::from_secs(60).into()),
-            // lb_policy: DiscoveryType::LogicalDns(),
-            load_assignment: Some(ClusterLoadAssignment {
-                cluster_name: self.cluster_name(),
-                endpoints: vec![LocalityLbEndpoints {
-                    lb_endpoints: vec![LbEndpoint {
-                        host_identifier: Some(HostIdentifier::Endpoint(Endpoint {
-                            address: Some(Address {
-                                address: Some(socketaddress),
-                            }),
-                            // hostname: self.target_domain.to_string(),
-                            ..Default::default()
-                        })),
-                        ..Default::default()
-                    }],
-                    ..Default::default()
-                }],
-                ..Default::default()
-            }),
-            ..Default::default()
-        })
+        Ok(get_envoy_cluster(
+            self.cluster_name(),
+            self.target_domain.clone(),
+        ))
     }
 
     fn export_listener(&self) -> Result<Listener> {
