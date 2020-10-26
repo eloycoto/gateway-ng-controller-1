@@ -7,6 +7,7 @@ use std::io::BufReader;
 use std::path::Path;
 
 use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
+use crate::oidc::OIDCConfig;
 use crate::util;
 
 use crate::protobuf::envoy::config::core::v3::AsyncDataSource;
@@ -67,10 +68,18 @@ pub struct Service {
     pub policies: Vec<std::string::String>,
     pub target_domain: std::string::String,
     pub proxy_rules: Vec<MappingRules>,
+    pub oidc_issuer: std::string::String,
 }
 
 impl Service {
+    pub fn oidc_import(&self) {
+        let mut oidc_discovery = OIDCConfig::new(self.oidc_issuer.clone());
+        let result = oidc_discovery.export(self.id);
+        dbg!(result);
+    }
+
     pub fn export(&self) -> Result<Vec<EnvoyExport>> {
+        self.oidc_import();
         let mut result: Vec<EnvoyExport> = Vec::new();
         let cluster = self
             .export_clusters()

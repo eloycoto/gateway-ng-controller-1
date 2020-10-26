@@ -105,6 +105,12 @@ pub mod envoy {
                     #[path = "envoy.extensions.filters.http.wasm.v3.rs"]
                     pub mod v3;
                 }
+
+                #[path = "."]
+                pub mod jwt_authn {
+                    #[path = "envoy.extensions.filters.http.jwt_authn.v3.rs"]
+                    pub mod v3;
+                }
             }
         }
     }
