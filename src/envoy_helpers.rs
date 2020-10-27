@@ -1,6 +1,7 @@
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
+
 use crate::protobuf::envoy::config::listener::v3::Listener;
-use url::{ParseError, Url};
+use url::Url;
 pub type EnvoyExportList = Vec<EnvoyExport>;
 
 // These are structs to export config to the config:cache
@@ -16,21 +17,22 @@ pub enum EnvoyResource {
     Cluster(Cluster),
     Listener(Listener),
 }
-
 use crate::protobuf::envoy::config::cluster::v3::cluster::ClusterDiscoveryType;
 use crate::protobuf::envoy::config::core::v3::address::Address as AddressType;
 use crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier;
+use crate::protobuf::envoy::config::core::v3::transport_socket::ConfigType;
 use crate::protobuf::envoy::config::core::v3::Address;
 use crate::protobuf::envoy::config::core::v3::SocketAddress;
+use crate::protobuf::envoy::config::core::v3::TransportSocket;
 use crate::protobuf::envoy::config::endpoint::v3::lb_endpoint::HostIdentifier;
 use crate::protobuf::envoy::config::endpoint::v3::ClusterLoadAssignment;
 use crate::protobuf::envoy::config::endpoint::v3::Endpoint;
 use crate::protobuf::envoy::config::endpoint::v3::LbEndpoint;
 use crate::protobuf::envoy::config::endpoint::v3::LocalityLbEndpoints;
 
-use crate::util;
-
 use prost_types::Duration;
+
+use anyhow::Result;
 
 pub fn get_envoy_cluster(name: std::string::String, target_url: std::string::String) -> Cluster {
     let target_host = Url::parse(target_url.as_str()).unwrap();
@@ -51,7 +53,7 @@ pub fn get_envoy_cluster(name: std::string::String, target_url: std::string::Str
         ..Default::default()
     });
 
-    Cluster {
+    let mut cluster = Cluster {
         name: name.clone(),
         connect_timeout: Some(Duration {
             seconds: 1,
@@ -77,5 +79,28 @@ pub fn get_envoy_cluster(name: std::string::String, target_url: std::string::Str
             ..Default::default()
         }),
         ..Default::default()
+    };
+    if target_host.scheme() == "https" {
+        use crate::protobuf::envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext;
+        cluster.transport_socket = Some(TransportSocket {
+            name: "envoy.transport_sockets.tls".to_string(),
+            config_type: Some(ConfigType::TypedConfig(prost_types::Any {
+                type_url:
+                    "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext"
+                        .to_string(),
+                value: encode(UpstreamTlsContext {
+                    sni: target_host.host_str().unwrap().to_string(),
+                    ..Default::default()
+                })
+                .unwrap(),
+            })),
+        })
     }
+    cluster
+}
+
+pub fn encode(arg: impl prost::Message) -> Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    prost::Message::encode(&arg, &mut buf)?;
+    Ok(buf)
 }

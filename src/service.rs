@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use crate::envoy_helpers::{get_envoy_cluster, EnvoyExport, EnvoyResource};
+use crate::envoy_helpers::{encode, get_envoy_cluster, EnvoyExport, EnvoyResource};
 use crate::oidc::OIDCConfig;
 use crate::util;
 
@@ -19,16 +19,10 @@ use crate::protobuf::envoy::extensions::filters::http::wasm::v3::Wasm;
 use crate::protobuf::envoy::extensions::wasm::v3::plugin_config::Vm;
 use crate::protobuf::envoy::extensions::wasm::v3::{PluginConfig, VmConfig};
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
-use crate::protobuf::envoy::config::cluster::v3::cluster::ClusterDiscoveryType;
 use crate::protobuf::envoy::config::core::v3::Address;
 use crate::protobuf::envoy::config::core::v3::SocketAddress;
 use crate::protobuf::envoy::config::core::v3::address::Address as AddressType;
 use crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier;
-use crate::protobuf::envoy::config::endpoint::v3::ClusterLoadAssignment;
-use crate::protobuf::envoy::config::endpoint::v3::Endpoint;
-use crate::protobuf::envoy::config::endpoint::v3::LbEndpoint;
-use crate::protobuf::envoy::config::endpoint::v3::LocalityLbEndpoints;
-use crate::protobuf::envoy::config::endpoint::v3::lb_endpoint::HostIdentifier;
 use crate::protobuf::envoy::config::listener::v3::Filter;
 use crate::protobuf::envoy::config::listener::v3::FilterChain;
 use crate::protobuf::envoy::config::listener::v3::Listener;
@@ -46,10 +40,7 @@ use crate::protobuf::envoy::extensions::filters::network::http_connection_manage
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_connection_manager::RouteSpecifier;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_filter;
-// @TODO target domain connect_timeout
-// @TODO optional fields
-//
-//
+use crate::protobuf::envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 
 const WASM_FILTER_PATH: &str = "static/filter.wasm";
 
@@ -72,14 +63,23 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn oidc_import(&self) {
+    pub fn oidc_import(&self) -> (JwtAuthentication, Cluster) {
         let mut oidc_discovery = OIDCConfig::new(self.oidc_issuer.clone());
-        let result = oidc_discovery.export(self.id);
-        dbg!(result);
+        oidc_discovery.export(self.id)
     }
 
     pub fn export(&self) -> Result<Vec<EnvoyExport>> {
-        self.oidc_import();
+        let (oidc_filter, oidc_cluster) = self.oidc_import();
+
+        let oidc_envoy_filter = HttpFilter {
+            name: "envoy.filters.http.jwt_authn".to_string(),
+            config_type: Some(http_filter::ConfigType::TypedConfig(prost_types::Any {
+                type_url: "type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication"
+                    .to_string(),
+                value: encode(oidc_filter)?,
+            })),
+        };
+
         let mut result: Vec<EnvoyExport> = Vec::new();
         let cluster = self
             .export_clusters()
@@ -90,9 +90,14 @@ impl Service {
             config: EnvoyResource::Cluster(cluster),
         });
 
+        result.push(EnvoyExport {
+            key: oidc_cluster.clone().name,
+            config: EnvoyResource::Cluster(oidc_cluster),
+        });
+
         // Listener entries
         let listener = self
-            .export_listener()
+            .export_listener(Some(oidc_envoy_filter))
             .with_context(|| format!("failed to export listener for service {}", self.id))?;
         result.push(EnvoyExport {
             key: format!("service::id::{}::listener", self.id),
@@ -113,14 +118,14 @@ impl Service {
         ))
     }
 
-    fn export_listener(&self) -> Result<Listener> {
+    fn export_listener(&self, http_filter: Option<HttpFilter>) -> Result<Listener> {
         let mut filters = Vec::new();
 
-        fn encode(arg: impl prost::Message) -> Result<Vec<u8>> {
-            let mut buf = Vec::new();
-            prost::Message::encode(&arg, &mut buf)?;
-            Ok(buf)
-        }
+        // fn encode(arg: impl prost::Message) -> Result<Vec<u8>> {
+        //     let mut buf = Vec::new();
+        //     prost::Message::encode(&arg, &mut buf)?;
+        //     Ok(buf)
+        // }
 
         let config = prost_types::Any {
             type_url: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
@@ -170,6 +175,7 @@ impl Service {
             stat_prefix: "ingress_http".to_string(),
             codec_type: 0,
             http_filters: vec![
+                http_filter.unwrap(),
                 HttpFilter {
                     name: "envoy.filters.http.wasm".to_string(),
                     config_type: Some(http_filter::ConfigType::TypedConfig(prost_types::Any {

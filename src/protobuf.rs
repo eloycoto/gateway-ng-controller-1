@@ -76,6 +76,16 @@ pub mod envoy {
     pub mod extensions {
 
         #[path = "."]
+        pub mod transport_sockets {
+
+            #[path = "."]
+            pub mod tls {
+                #[path = "envoy.extensions.transport_sockets.tls.v3.rs"]
+                pub mod v3;
+            }
+        }
+
+        #[path = "."]
         pub mod wasm {
             #[path = "envoy.extensions.wasm.v3.rs"]
             pub mod v3;
