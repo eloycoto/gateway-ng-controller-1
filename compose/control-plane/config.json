@@ -3,9 +3,8 @@
     "id": 1,
     "hosts": ["web", "web.app"],
     "policies": [],
-    "target_domain": "web.app:80",
-    "proxy_rules": [
-      {
+    "target_domain": "http://web.app:80",
+    "oidc_issuer": "https://keycloak-redhat-sso.apps.dev-eng-ocp4-5.dev.3sca.net/auth/realms/Eloy-wasm-test", "proxy_rules": [ {
         "pattern": "/",
         "http_method": "GET",
         "metric_system_name": "hits",
