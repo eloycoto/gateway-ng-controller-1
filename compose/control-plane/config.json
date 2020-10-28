@@ -10,6 +10,12 @@
         "http_method": "GET",
         "metric_system_name": "hits",
         "delta": 1
+      },
+      {
+        "pattern": "/headers",
+        "http_method": "GET",
+        "metric_system_name": "hits",
+        "delta": 1
       }
     ]
   }
