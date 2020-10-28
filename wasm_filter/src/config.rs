@@ -33,9 +33,9 @@ impl MappingRule {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Service {
     pub id: u32,
-    pub hosts: Vec<std::string::String>,
-    pub policies: Vec<std::string::String>,
-    pub target_domain: std::string::String,
+    pub hosts: Vec<String>,
+    pub policies: Vec<String>,
+    pub target_domain: String,
     pub proxy_rules: Vec<MappingRule>,
 }
 
@@ -64,27 +64,16 @@ thread_local! {
 }
 
 pub fn get_config() -> Service {
-    let mut config = Service::default();
-    CONFIG.with(|c| {
-        let config_borrow = c.borrow();
-        config = config_borrow.clone();
-    });
-    return config;
+    CONFIG.with(|c| c.borrow().clone())
 }
 
 pub fn import_config(config: &str) -> Service {
     let service: Service = serde_json::from_str(config).unwrap();
-    CONFIG.with(|c| {
-        log::info!("HERE IS THE CONFIG");
-        // *c.borrow_mut() = service.clone();
-        match c.try_borrow_mut() {
-            Err(e) => {
-                log::info!("ERROR HERE@ {:?}", e);
-            }
-            Ok(mut r) => *r = service.clone(),
+    CONFIG.with(|c| match c.try_borrow_mut() {
+        Err(e) => {
+            log::info!("Cannot import the config, err='{:?}'", e);
         }
-
-        log::info!("FINISH IS THE CONFIG");
+        Ok(mut r) => *r = service.clone(),
     });
     service
 }

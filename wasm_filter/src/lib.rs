@@ -43,7 +43,7 @@ impl Context for HttpHeaders {
     fn on_http_call_response(&mut self, _: u32, _: usize, _: usize, _: usize) {
         let headers = self.get_http_call_response_headers();
         for (name, value) in &headers {
-            if name == &":status".to_string() && value == &"200".to_string() {
+            if name.as_str() == ":status" && value.as_str() == "200" {
                 log::info!("Access granted.");
                 self.resume_http_request();
                 return;
@@ -84,6 +84,7 @@ impl HttpHeaders {
 impl HttpContext for HttpHeaders {
     fn on_http_request_headers(&mut self, _: usize) -> Action {
         let config = config::get_config();
+
         let (status, metrics) =
             config.match_mapping_rule(self.get_method().unwrap(), self.get_path().unwrap());
         if !status {
