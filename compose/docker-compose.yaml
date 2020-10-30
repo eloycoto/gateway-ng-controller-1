@@ -48,6 +48,7 @@ services:
     image: control-plane
     volumes:
       - ./control-plane/config.json:/home/app/bin/log.json:z,ro
+      - ./control-plane/static:/home/app/bin/static:z,ro
     expose:
       - "5000"
       - "5001"
