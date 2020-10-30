@@ -71,11 +71,8 @@ impl OIDCConfig {
 
     pub fn export(&mut self, service_id: u32) -> (JwtAuthentication, Cluster) {
         self.import_config(service_id);
-
-        let cluster = get_envoy_cluster(
-            format!("Service::{}::OIDC", service_id),
-            self.issuer.clone(),
-        );
+        let cluster_name = format!("Service::{}::OIDC", service_id);
+        let cluster = get_envoy_cluster(cluster_name.clone(), self.issuer.clone());
 
         let provider = JwtProvider {
             issuer: self.issuer.clone(),
@@ -92,9 +89,7 @@ impl OIDCConfig {
                         seconds: 100,
                         nanos: 0,
                     }),
-                    http_upstream_type: Some(HttpUpstreamType::Cluster(
-                        format!("keycloak").to_string(),
-                    )),
+                    http_upstream_type: Some(HttpUpstreamType::Cluster(cluster_name)),
                     ..Default::default()
                 }),
                 cache_duration: None,
