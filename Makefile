@@ -51,6 +51,10 @@ up: $(up-deps) ## Start docker-compose containers
 stop: ## Stop docker-compose containers
 	$(DOCKER_COMPOSE) stop
 
+.PHONY: build
+build: ## Build containers
+	$(DOCKER_COMPOSE) build
+
 status: ## Status of docker-compose containers
 	$(DOCKER_COMPOSE) ps
 
