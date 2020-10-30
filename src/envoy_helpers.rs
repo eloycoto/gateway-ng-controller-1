@@ -62,7 +62,7 @@ pub fn get_envoy_cluster(name: std::string::String, target_url: std::string::Str
         cluster_discovery_type: Some(ClusterDiscoveryType::Type(2)),
         dns_refresh_rate: Some(core::time::Duration::from_secs(60).into()),
         load_assignment: Some(ClusterLoadAssignment {
-            cluster_name: name.clone(),
+            cluster_name: name,
             endpoints: vec![LocalityLbEndpoints {
                 lb_endpoints: vec![LbEndpoint {
                     host_identifier: Some(HostIdentifier::Endpoint(Endpoint {

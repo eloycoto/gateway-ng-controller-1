@@ -15,7 +15,6 @@ use crate::protobuf::envoy::extensions::filters::http::jwt_authn::v3::Requiremen
 use crate::envoy_helpers::get_envoy_cluster;
 use curl::easy::Easy;
 use prost_types::Duration;
-use serde_json::{Map, Value};
 
 #[derive(Default)]
 pub struct OIDCConfig {
@@ -27,11 +26,11 @@ pub struct OIDCConfig {
 
 impl OIDCConfig {
     pub fn new(issuer: std::string::String) -> OIDCConfig {
-        return OIDCConfig {
-            issuer: issuer,
+        OIDCConfig {
+            issuer,
             audiences: Vec::new(),
             ..Default::default()
-        };
+        }
     }
 
     fn request(&self, target_url: &str) -> String {
@@ -50,7 +49,7 @@ impl OIDCConfig {
                 .unwrap();
             transfer.perform().unwrap();
         }
-        return String::from_utf8(dst.to_vec().clone()).unwrap();
+        String::from_utf8(dst.to_vec()).unwrap()
     }
 
     pub fn import_config(&mut self, service_id: u32) {
@@ -90,7 +89,6 @@ impl OIDCConfig {
                         nanos: 0,
                     }),
                     http_upstream_type: Some(HttpUpstreamType::Cluster(cluster_name)),
-                    ..Default::default()
                 }),
                 cache_duration: None,
             })),
@@ -102,18 +100,18 @@ impl OIDCConfig {
         providers.insert(provider_name.clone(), provider);
 
         let filter = JwtAuthentication {
-            providers: providers,
+            providers,
             rules: vec![RequirementRule {
                 r#match: Some(RouteMatch {
                     path_specifier: Some(PathSpecifier::Prefix("/".to_string())),
                     ..Default::default()
                 }),
                 requires: Some(JwtRequirement {
-                    requires_type: Some(RequiresType::ProviderName(provider_name.clone())),
+                    requires_type: Some(RequiresType::ProviderName(provider_name)),
                 }),
             }],
             ..Default::default()
         };
-        return (filter, cluster);
+        (filter, cluster)
     }
 }
