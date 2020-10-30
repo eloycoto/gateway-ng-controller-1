@@ -4,7 +4,7 @@
     "hosts": ["web", "web.app"],
     "policies": [],
     "target_domain": "http://web.app:80",
-    "oidc_issuer": "http://localhost:8080/auth/realms/ostia",
+    "oidc_issuer": "http://keycloak:8080/auth/realms/ostia",
     "proxy_rules": [
       {
         "pattern": "/",

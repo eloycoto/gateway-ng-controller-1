@@ -3,7 +3,7 @@ FROM rust AS build
 RUN export DEBIAN_FRONTEND=noninteractive \
  && apt-get update -y \
  && apt-get -y dist-upgrade \
- && apt-get install curl -y \
+ && apt-get install libcurl4 -y \
  && rustup component add rustfmt
 
 WORKDIR /usr/src/gateway-ng-controller
@@ -20,6 +20,11 @@ COPY . .
 RUN cargo build --release
 
 FROM debian
+
+RUN export DEBIAN_FRONTEND=noninteractive \
+ && apt-get update -y \
+ && apt-get -y dist-upgrade \
+ && apt-get install libcurl4 curl -y
 
 WORKDIR /home/app/bin
 ENV PATH="/home/app/bin:${PATH}"
