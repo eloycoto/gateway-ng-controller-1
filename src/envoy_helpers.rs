@@ -34,22 +34,17 @@ pub enum EnvoyResource {
     Listener(Listener),
 }
 
-pub fn get_envoy_cluster(name: std::string::String, target_url: std::string::String) -> Cluster {
-    let target_host = Url::parse(target_url.as_str()).unwrap();
-    let port = match target_host.port() {
-        Some(port) => port,
-        _ => {
-            if target_host.scheme() == "https" {
-                443
-            } else {
-                80
-            }
-        }
-    };
+pub fn get_envoy_cluster(
+    name: std::string::String,
+    target_url: std::string::String,
+) -> Result<Cluster> {
+    let target_host = Url::parse(target_url.as_str())?;
 
     let socketaddress = AddressType::SocketAddress(SocketAddress {
         address: target_host.host_str().unwrap().to_string(),
-        port_specifier: Some(PortSpecifier::PortValue(port as u32)),
+        port_specifier: Some(PortSpecifier::PortValue(
+            target_host.port_or_known_default().unwrap() as u32,
+        )),
         ..Default::default()
     });
 
@@ -97,7 +92,7 @@ pub fn get_envoy_cluster(name: std::string::String, target_url: std::string::Str
             })),
         })
     }
-    cluster
+    Ok(cluster)
 }
 
 pub fn encode(arg: impl prost::Message) -> Result<Vec<u8>> {

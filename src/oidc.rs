@@ -13,6 +13,7 @@ use crate::protobuf::envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks
 use crate::protobuf::envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
 
 use crate::envoy_helpers::get_envoy_cluster;
+// use anyhow::Result;
 use curl::easy::Easy;
 use prost_types::Duration;
 
@@ -28,33 +29,31 @@ impl OIDCConfig {
     pub fn new(issuer: std::string::String) -> OIDCConfig {
         OIDCConfig {
             issuer,
-            audiences: Vec::new(),
             ..Default::default()
         }
     }
 
-    fn request(&self, target_url: &str) -> String {
+    fn request(&self, target_url: &str) -> Result<String, anyhow::Error> {
         let mut dst = Vec::new();
         let mut easy = Easy::new();
         {
-            easy.url(target_url).unwrap();
+            easy.url(target_url)?;
             easy.ssl_verify_host(false).unwrap();
             easy.ssl_verify_peer(false).unwrap();
             let mut transfer = easy.transfer();
-            transfer
-                .write_function(|data| {
-                    dst.extend_from_slice(data);
-                    Ok(data.len())
-                })
-                .unwrap();
-            transfer.perform().unwrap();
+            transfer.write_function(|data| {
+                dst.extend_from_slice(data);
+                Ok(data.len())
+            })?;
+            transfer.perform()?;
         }
-        String::from_utf8(dst.to_vec()).unwrap()
+        Ok(String::from_utf8(dst.to_vec())?)
     }
 
-    pub fn import_config(&mut self, service_id: u32) {
+    pub fn import_config(&mut self, service_id: u32) -> Result<(), anyhow::Error> {
         let data =
-            self.request(format!("{}/.well-known/openid-configuration", self.issuer).as_str());
+            self.request(format!("{}/.well-known/openid-configuration", self.issuer).as_str())?;
+
         let key_values: std::collections::HashMap<String, serde_json::Value> =
             serde_json::from_str(&data.as_str()).unwrap();
 
@@ -66,12 +65,16 @@ impl OIDCConfig {
             .to_string();
         self.cluster = format!("Service::{}::OIDC", service_id);
         self.audiences.push("admin-cli".to_string());
+        Ok(())
     }
 
-    pub fn export(&mut self, service_id: u32) -> (JwtAuthentication, Cluster) {
-        self.import_config(service_id);
+    pub fn export(
+        &mut self,
+        service_id: u32,
+    ) -> Result<(JwtAuthentication, Cluster), anyhow::Error> {
+        self.import_config(service_id)?;
         let cluster_name = format!("Service::{}::OIDC", service_id);
-        let cluster = get_envoy_cluster(cluster_name.clone(), self.issuer.clone());
+        let cluster = get_envoy_cluster(cluster_name.clone(), self.issuer.clone())?;
 
         let provider = JwtProvider {
             issuer: self.issuer.clone(),
@@ -112,6 +115,6 @@ impl OIDCConfig {
             }],
             ..Default::default()
         };
-        (filter, cluster)
+        Ok((filter, cluster))
     }
 }

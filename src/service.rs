@@ -63,13 +63,13 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn oidc_import(&self) -> (JwtAuthentication, Cluster) {
+    pub fn oidc_import(&self) -> Result<(JwtAuthentication, Cluster)> {
         let mut oidc_discovery = OIDCConfig::new(self.oidc_issuer.clone());
         oidc_discovery.export(self.id)
     }
 
     pub fn export(&self) -> Result<Vec<EnvoyExport>> {
-        let (oidc_filter, oidc_cluster) = self.oidc_import();
+        let (oidc_filter, oidc_cluster) = self.oidc_import()?;
 
         let oidc_envoy_filter = HttpFilter {
             name: "envoy.filters.http.jwt_authn".to_string(),
@@ -112,20 +112,11 @@ impl Service {
     }
 
     fn export_clusters(&self) -> Result<Cluster> {
-        Ok(get_envoy_cluster(
-            self.cluster_name(),
-            self.target_domain.clone(),
-        ))
+        get_envoy_cluster(self.cluster_name(), self.target_domain.clone())
     }
 
     fn export_listener(&self, http_filter: Option<HttpFilter>) -> Result<Listener> {
         let mut filters = Vec::new();
-
-        // fn encode(arg: impl prost::Message) -> Result<Vec<u8>> {
-        //     let mut buf = Vec::new();
-        //     prost::Message::encode(&arg, &mut buf)?;
-        //     Ok(buf)
-        // }
 
         let config = prost_types::Any {
             type_url: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
@@ -171,24 +162,30 @@ impl Service {
             }),
         };
 
+        let mut http_filters = Vec::new();
+
+        if let Some(filter) = http_filter {
+            http_filters.push(filter);
+        }
+
+        http_filters.push(HttpFilter {
+            name: "envoy.filters.http.wasm".to_string(),
+            config_type: Some(http_filter::ConfigType::TypedConfig(prost_types::Any {
+                type_url: "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
+                    .to_string(),
+                value: encode(wasm_filter)?,
+            })),
+        });
+
+        http_filters.push(HttpFilter {
+            name: "envoy.filters.http.router".to_string(),
+            config_type: Some(http_filter::ConfigType::TypedConfig(config)),
+        });
+
         let connection_manager = HttpConnectionManager {
             stat_prefix: "ingress_http".to_string(),
             codec_type: 0,
-            http_filters: vec![
-                http_filter.unwrap(),
-                HttpFilter {
-                    name: "envoy.filters.http.wasm".to_string(),
-                    config_type: Some(http_filter::ConfigType::TypedConfig(prost_types::Any {
-                        type_url: "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
-                            .to_string(),
-                        value: encode(wasm_filter)?,
-                    })),
-                },
-                HttpFilter {
-                    name: "envoy.filters.http.router".to_string(),
-                    config_type: Some(http_filter::ConfigType::TypedConfig(config)),
-                },
-            ],
+            http_filters,
             route_specifier: Some(RouteSpecifier::RouteConfig(RouteConfiguration {
                 name: format!("service_{:?}_route", self.id),
                 virtual_hosts: vec![VirtualHost {
