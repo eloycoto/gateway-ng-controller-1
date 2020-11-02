@@ -89,9 +89,9 @@ impl HttpContext for HttpHeaders {
             config.match_mapping_rule(self.get_method().unwrap(), self.get_path().unwrap());
         if !status {
             self.send_http_response(403, vec![], Some(b"Mapping rule not found\n"));
-            return Action::Pause;
+        } else {
+            self.authrep(metrics);
         }
-        self.authrep(metrics);
         Action::Pause
     }
 
