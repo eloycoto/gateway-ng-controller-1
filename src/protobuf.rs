@@ -76,6 +76,16 @@ pub mod envoy {
     pub mod extensions {
 
         #[path = "."]
+        pub mod transport_sockets {
+
+            #[path = "."]
+            pub mod tls {
+                #[path = "envoy.extensions.transport_sockets.tls.v3.rs"]
+                pub mod v3;
+            }
+        }
+
+        #[path = "."]
         pub mod wasm {
             #[path = "envoy.extensions.wasm.v3.rs"]
             pub mod v3;
@@ -103,6 +113,12 @@ pub mod envoy {
                 #[path = "."]
                 pub mod wasm {
                     #[path = "envoy.extensions.filters.http.wasm.v3.rs"]
+                    pub mod v3;
+                }
+
+                #[path = "."]
+                pub mod jwt_authn {
+                    #[path = "envoy.extensions.filters.http.jwt_authn.v3.rs"]
                     pub mod v3;
                 }
             }

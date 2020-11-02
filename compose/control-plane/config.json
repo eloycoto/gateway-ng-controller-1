@@ -3,7 +3,8 @@
     "id": 1,
     "hosts": ["web", "web.app"],
     "policies": [],
-    "target_domain": "web.app:80",
+    "target_domain": "http://web.app:80",
+    "oidc_issuer": "http://keycloak:8080/auth/realms/ostia",
     "proxy_rules": [
       {
         "pattern": "/",

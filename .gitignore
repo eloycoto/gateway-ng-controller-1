@@ -8,3 +8,4 @@
 # Wasm filter
 /wasm_filter/target
 
+/compose/control-plane/static/*

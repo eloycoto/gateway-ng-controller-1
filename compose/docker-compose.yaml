@@ -48,6 +48,7 @@ services:
     image: control-plane
     volumes:
       - ./control-plane/config.json:/home/app/bin/log.json:z,ro
+      - ./control-plane/static:/home/app/bin/static:z,ro
     expose:
       - "5000"
       - "5001"
@@ -59,6 +60,20 @@ services:
       control-plane:
         aliases:
           - ${CONTROL_PLANE_DOCKER:-control-plane-main}
+  keycloak:
+    image: jboss/keycloak
+    environment:
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: p
+      KEYCLOAK_IMPORT: /tmp/import-realm.json -Dkeycloak.profile.feature.upload_scripts=enabled
+    volumes:
+      - ./keycloak-realm.json:/tmp/import-realm.json:z,ro
+    ports:
+      - "8080:8080"
+    networks:
+      control-plane:
+        aliases:
+          - keycloak
 
 networks:
   control-plane:

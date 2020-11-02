@@ -6,7 +6,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use crate::envoy_helpers::{EnvoyExport, EnvoyResource};
+use crate::envoy_helpers::{encode, get_envoy_cluster, EnvoyExport, EnvoyResource};
+use crate::oidc::OIDCConfig;
 use crate::util;
 
 use crate::protobuf::envoy::config::core::v3::AsyncDataSource;
@@ -18,16 +19,10 @@ use crate::protobuf::envoy::extensions::filters::http::wasm::v3::Wasm;
 use crate::protobuf::envoy::extensions::wasm::v3::plugin_config::Vm;
 use crate::protobuf::envoy::extensions::wasm::v3::{PluginConfig, VmConfig};
 use crate::protobuf::envoy::config::cluster::v3::Cluster;
-use crate::protobuf::envoy::config::cluster::v3::cluster::ClusterDiscoveryType;
 use crate::protobuf::envoy::config::core::v3::Address;
 use crate::protobuf::envoy::config::core::v3::SocketAddress;
 use crate::protobuf::envoy::config::core::v3::address::Address as AddressType;
 use crate::protobuf::envoy::config::core::v3::socket_address::PortSpecifier;
-use crate::protobuf::envoy::config::endpoint::v3::ClusterLoadAssignment;
-use crate::protobuf::envoy::config::endpoint::v3::Endpoint;
-use crate::protobuf::envoy::config::endpoint::v3::LbEndpoint;
-use crate::protobuf::envoy::config::endpoint::v3::LocalityLbEndpoints;
-use crate::protobuf::envoy::config::endpoint::v3::lb_endpoint::HostIdentifier;
 use crate::protobuf::envoy::config::listener::v3::Filter;
 use crate::protobuf::envoy::config::listener::v3::FilterChain;
 use crate::protobuf::envoy::config::listener::v3::Listener;
@@ -45,10 +40,7 @@ use crate::protobuf::envoy::extensions::filters::network::http_connection_manage
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_connection_manager::RouteSpecifier;
 use crate::protobuf::envoy::extensions::filters::network::http_connection_manager::v3::http_filter;
-// @TODO target domain connect_timeout
-// @TODO optional fields
-//
-//
+use crate::protobuf::envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 
 const WASM_FILTER_PATH: &str = "static/filter.wasm";
 
@@ -67,10 +59,27 @@ pub struct Service {
     pub policies: Vec<std::string::String>,
     pub target_domain: std::string::String,
     pub proxy_rules: Vec<MappingRules>,
+    pub oidc_issuer: std::string::String,
 }
 
 impl Service {
+    pub fn oidc_import(&self) -> Result<(JwtAuthentication, Cluster)> {
+        let mut oidc_discovery = OIDCConfig::new(self.oidc_issuer.clone());
+        oidc_discovery.export(self.id)
+    }
+
     pub fn export(&self) -> Result<Vec<EnvoyExport>> {
+        let (oidc_filter, oidc_cluster) = self.oidc_import()?;
+
+        let oidc_envoy_filter = HttpFilter {
+            name: "envoy.filters.http.jwt_authn".to_string(),
+            config_type: Some(http_filter::ConfigType::TypedConfig(prost_types::Any {
+                type_url: "type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication"
+                    .to_string(),
+                value: encode(oidc_filter)?,
+            })),
+        };
+
         let mut result: Vec<EnvoyExport> = Vec::new();
         let cluster = self
             .export_clusters()
@@ -81,9 +90,14 @@ impl Service {
             config: EnvoyResource::Cluster(cluster),
         });
 
+        result.push(EnvoyExport {
+            key: oidc_cluster.clone().name,
+            config: EnvoyResource::Cluster(oidc_cluster),
+        });
+
         // Listener entries
         let listener = self
-            .export_listener()
+            .export_listener(Some(oidc_envoy_filter))
             .with_context(|| format!("failed to export listener for service {}", self.id))?;
         result.push(EnvoyExport {
             key: format!("service::id::{}::listener", self.id),
@@ -98,53 +112,11 @@ impl Service {
     }
 
     fn export_clusters(&self) -> Result<Cluster> {
-        let (host, port) = util::host_port::parse(self.target_domain.as_str())?;
-        let address = host.into();
-        let port_specifier = port.or(Some(80)).map(PortSpecifier::PortValue);
-        let socketaddress = AddressType::SocketAddress(SocketAddress {
-            address,
-            port_specifier,
-            ..Default::default()
-        });
-
-        Ok(Cluster {
-            name: self.cluster_name(),
-            connect_timeout: Some(Duration {
-                seconds: 1,
-                nanos: 0,
-            }),
-            cluster_discovery_type: Some(ClusterDiscoveryType::Type(2)),
-            dns_refresh_rate: Some(core::time::Duration::from_secs(60).into()),
-            // lb_policy: DiscoveryType::LogicalDns(),
-            load_assignment: Some(ClusterLoadAssignment {
-                cluster_name: self.cluster_name(),
-                endpoints: vec![LocalityLbEndpoints {
-                    lb_endpoints: vec![LbEndpoint {
-                        host_identifier: Some(HostIdentifier::Endpoint(Endpoint {
-                            address: Some(Address {
-                                address: Some(socketaddress),
-                            }),
-                            // hostname: self.target_domain.to_string(),
-                            ..Default::default()
-                        })),
-                        ..Default::default()
-                    }],
-                    ..Default::default()
-                }],
-                ..Default::default()
-            }),
-            ..Default::default()
-        })
+        get_envoy_cluster(self.cluster_name(), self.target_domain.clone())
     }
 
-    fn export_listener(&self) -> Result<Listener> {
+    fn export_listener(&self, http_filter: Option<HttpFilter>) -> Result<Listener> {
         let mut filters = Vec::new();
-
-        fn encode(arg: impl prost::Message) -> Result<Vec<u8>> {
-            let mut buf = Vec::new();
-            prost::Message::encode(&arg, &mut buf)?;
-            Ok(buf)
-        }
 
         let config = prost_types::Any {
             type_url: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
@@ -190,23 +162,30 @@ impl Service {
             }),
         };
 
+        let mut http_filters = Vec::new();
+
+        if let Some(filter) = http_filter {
+            http_filters.push(filter);
+        }
+
+        http_filters.push(HttpFilter {
+            name: "envoy.filters.http.wasm".to_string(),
+            config_type: Some(http_filter::ConfigType::TypedConfig(prost_types::Any {
+                type_url: "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
+                    .to_string(),
+                value: encode(wasm_filter)?,
+            })),
+        });
+
+        http_filters.push(HttpFilter {
+            name: "envoy.filters.http.router".to_string(),
+            config_type: Some(http_filter::ConfigType::TypedConfig(config)),
+        });
+
         let connection_manager = HttpConnectionManager {
             stat_prefix: "ingress_http".to_string(),
             codec_type: 0,
-            http_filters: vec![
-                HttpFilter {
-                    name: "envoy.filters.http.wasm".to_string(),
-                    config_type: Some(http_filter::ConfigType::TypedConfig(prost_types::Any {
-                        type_url: "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
-                            .to_string(),
-                        value: encode(wasm_filter)?,
-                    })),
-                },
-                HttpFilter {
-                    name: "envoy.filters.http.router".to_string(),
-                    config_type: Some(http_filter::ConfigType::TypedConfig(config)),
-                },
-            ],
+            http_filters,
             route_specifier: Some(RouteSpecifier::RouteConfig(RouteConfiguration {
                 name: format!("service_{:?}_route", self.id),
                 virtual_hosts: vec![VirtualHost {

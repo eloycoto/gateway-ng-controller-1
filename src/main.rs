@@ -7,6 +7,7 @@ mod configuration;
 mod envoy_cds;
 mod envoy_helpers;
 mod envoy_lds;
+mod oidc;
 mod processor;
 // rustfmt stable will break down with #[path = "..."] in modules, so skip
 // this module for now. See https://github.com/rust-lang/rustfmt/issues/4446.
