@@ -1,6 +1,8 @@
 use proxy_wasm::traits::*;
 use proxy_wasm::types::*;
 
+use prost::Message;
+
 #[derive(Debug, Default)]
 pub struct Rules {
     path: String,
@@ -94,7 +96,15 @@ impl JWT {
         if data.is_none() {
             return Err(anyhow::Error::msg("Failed to get JWT payload"));
         }
-
+        log::info!("Bytes --> {:?}", data.clone().unwrap().as_slice());
+        log::info!(
+            "STR --> {:?}",
+            std::str::from_utf8(data.clone().unwrap().as_slice())
+        );
+        let msg: prost_types::Struct =
+            Message::decode_length_delimited(data.clone().unwrap().as_slice())
+                .expect("cannot decode message");
+        log::info!("MSG--> {:?}", msg);
         return Ok(data.unwrap());
     }
 
